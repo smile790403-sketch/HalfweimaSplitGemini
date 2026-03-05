@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>大地旅程分帳 Pro</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root { --sage: #4f6d5a; --earth: #8c7b6c; --beige: #f5f5dc; --dark: #2d4a3e; }
+        body { background-color: var(--beige); color: #333; font-family: -apple-system, sans-serif; }
+        .app-header { background: var(--dark); color: white; padding: 15px; text-align: center; font-weight: bold; }
+        .nav-bottom { background: white; border-top: 1px solid #ddd; position: fixed; bottom: 0; width: 100%; display: flex; justify-content: space-around; padding: 10px 0; z-index: 1000; }
+        .nav-item { color: #888; text-decoration: none; font-size: 0.75rem; text-align: center; }
+        .nav-item.active { color: var(--sage); font-weight: bold; }
+        .card { border: none; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        .btn-earth { background: var(--sage); color: white; border: none; border-radius: 10px; width: 100%; padding: 12px; font-weight: bold; }
+        .section { display: none; padding: 20px; padding-bottom: 80px; }
+        .section.active { display: block; }
+        .badge-mem { background: #eee; padding: 6px 12px; border-radius: 20px; margin: 3px; display: inline-block; cursor: pointer; font-size: 0.85rem; }
+        .badge-mem.active { background: var(--earth); color: white; }
+        .loading-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(255,255,255,0.8); display: flex; align-items: center; justify-content: center; z-index: 2000; display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="loading-overlay" id="loader">側載資料中...</div>
+    <div class="app-header">大地分帳 Pro</div>
+
+    <div id="sec-trip" class="section active">
+        <div class="card p-3">
+            <h6 class="mb-3">✈️ 新增旅程</h6>
+            <input type="text" id="t_name" class="form-control mb-2" placeholder="旅程名稱 (例: 2026 汶萊)">
+            <input type="text" id="t_members" class="form-control mb-2" placeholder="參與者 (逗號隔開)">
+            <button class="btn btn-earth mt-2" onclick="saveTrip()">建立並同步</button>
+        </div>
+        <h6>旅程清單</h6>
+        <div id="trip-list"></div>
+    </div>
+
+    <div id="sec-ex" class="section">
+        <div class="card p-3">
+            <h6 class="mb-3">💱 換匯紀錄</h6>
+            <select id="ex_trip" class="form-select mb-2"></select>
+            <div class="row g-2">
+                <div class="col-4"><input type="text" id="ex_cur" class="form-control" placeholder="BND"></div>
+                <div class="col-8"><input type="number" id="ex_rate" class="form-control" placeholder="匯率 (1外幣=?台幣)"></div>
+            </div>
+            <input type="number" id="ex_amt" class="form-control mt-2 mb-3" placeholder="外幣金額">
+            <button class="btn btn-earth" onclick="saveEx()">儲存換匯</button>
+        </div>
+        <div id="ex-list" class="small"></div>
+    </div>
+
+    <div id="sec-exp" class="section">
+        <div class="card p-3">
+            <select id="e_trip" class="form-select mb-2" onchange="syncMembers()"></select>
+            <input type="text" id="e_item" class="form-control mb-2" placeholder="品項名稱">
+            <div class="row g-2 mb-2">
+                <div class="col-8"><input type="number" id="e_amt" class="form-control" placeholder="金額" oninput="calcTwd()"></div>
+                <div class="col-4"><select id="e_cur" class="form-select" onchange="calcTwd()"><option>TWD</option><option>BND</option><option>JPY</option></select></div>
+            </div>
+            <div class="small text-muted mb-2">台幣預估: <span id="e_twd">0</span></div>
+            <div class="small fw-bold mb-1">付款人:</div>
+            <div id="p-box" class="mb-2"></div>
+            <div class="small fw-bold mb-1">參與人:</div>
+            <div id="m-box" class="mb-3"></div>
+            <button class="btn btn-earth" onclick="saveExp()">儲存支出</button>
+        </div>
+        <div id="exp-list"></div>
+    </div>
+
+    <div id="sec-ana" class="section">
+        <div class="card p-3">
+            <select id="ana_trip" class="form-select mb-3" onchange="renderCharts()"></select>
+            <canvas id="anaPie" class="mb-4"></canvas>
+            <h6 class="border-bottom pb-2">💡 清算結果</h6>
+            <div id="settle-list" class="small"></div>
+        </div>
+    </div>
+
+    <nav class="nav-bottom">
+        <a href="javascript:void(0)" class="nav-item active" onclick="showSec('trip', this)">旅程</a>
+        <a href="javascript:void(0)" class="nav-item" onclick="showSec('ex', this)">換匯</a>
+        <a href="javascript:void(0)" class="nav-item" onclick="showSec('exp', this)">記帳</a>
+        <a href="javascript:void(0)" class="nav-item" onclick="showSec('ana', this)">分析</a>
+    </nav>
+
+    <script>
+        const API_URL = "https://script.google.com/macros/s/AKfycbzbicmRk00xed3yYDhAnGLXkztKHOQrwPNttZEBTQapLLgrsbz2aD3xEdNJHQil5h2P/exec"; // ⚠️ 請替換為你的 GAS URL
+        let db = { Trips: [], Exchange: [], Expenses: [] };
+        let charts = {};
+
+        window.onload = fetchData;
+
+        async function fetchData() {
+            toggleLoader(true);
+            try {
+                const res = await fetch(API_URL);
+                db = await res.json();
+                renderAll();
+            } catch (e) { alert("讀取失敗，請檢查 API URL"); }
+            toggleLoader(false);
+        }
+
+        function renderAll() {
+            const trips = db.Trips.slice(1);
+            const options = trips.map(r => `<option value="${r[0]}">${r[0]}</option>`).join('');
+            ['ex_trip', 'e_trip', 'ana_trip'].forEach(id => document.getElementById(id).innerHTML = options);
+            
+            // 旅程列表
+            document.getElementById('trip-list').innerHTML = trips.map(r => `<div class="card p-2 mb-2 small"><b>${r[0]}</b><br>成員: ${r[3]}</div>`).join('');
+            
+            syncMembers();
+            renderCharts();
+        }
+
+        function showSec(id, el) {
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.getElementById('sec-' + id).classList.add('active');
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            el.classList.add('active');
+        }
+
+        function syncMembers() {
+            const tName = document.getElementById('e_trip').value;
+            const trip = db.Trips.find(r => r[0] == tName);
+            if(!trip) return;
+            const mems = trip[3].split(',').map(m => m.trim());
+            const html = (cls) => mems.map(m => `<span class="badge-mem ${cls}" onclick="this.classList.toggle('active')">${m}</span>`).join('');
+            document.getElementById('p-box').innerHTML = html('p-b');
+            document.getElementById('m-box').innerHTML = html('m-b');
+            document.querySelectorAll('.m-b').forEach(b => b.classList.add('active'));
+        }
+
+        async function postData(method, data) {
+            toggleLoader(true);
+            await fetch(API_URL, { method: 'POST', body: JSON.stringify({method, data}) });
+            await fetchData();
+        }
+
+        function saveTrip() {
+            const data = [document.getElementById('t_name').value, "", "", document.getElementById('t_members').value, "TWD"];
+            postData('Trips', data);
+        }
+
+        function saveEx() {
+            const r = document.getElementById('ex_rate').value;
+            const a = document.getElementById('ex_amt').value;
+            const data = [document.getElementById('ex_trip').value, new Date().toLocaleDateString(), "", document.getElementById('ex_cur').value, r, a, Math.round(r*a)];
+            postData('Exchange', data);
+        }
+
+        function saveExp() {
+            const ps = Array.from(document.querySelectorAll('.p-b.active')).map(b => b.innerText).join(',');
+            const ms = Array.from(document.querySelectorAll('.m-b.active')).map(b => b.innerText).join(',');
+            const data = [document.getElementById('e_trip').value, new Date().toLocaleDateString(), "其他", document.getElementById('e_item').value, document.getElementById('e_amt').value, document.getElementById('e_cur').value, document.getElementById('e_twd').innerText, ps, ms];
+            postData('Expenses', data);
+        }
+
+        function calcTwd() {
+            const trip = document.getElementById('e_trip').value;
+            const cur = document.getElementById('e_cur').value;
+            const amt = document.getElementById('e_amt').value;
+            if(cur === "TWD") { document.getElementById('e_twd').innerText = amt; return; }
+            const ex = db.Exchange.slice(1).reverse().find(r => r[0] == trip && r[3] == cur);
+            document.getElementById('e_twd').innerText = ex ? Math.round(amt * ex[4]) : "無匯率";
+        }
+
+        function renderCharts() {
+            const tName = document.getElementById('ana_trip').value;
+            const exps = db.Expenses.slice(1).filter(r => r[0] == tName);
+            const cats = {}; exps.forEach(r => cats[r[2]] = (cats[r[2]] || 0) + Number(r[6]));
+            
+            if(charts.p) charts.p.destroy();
+            charts.p = new Chart(document.getElementById('anaPie'), { type: 'doughnut', data: { labels: Object.keys(cats), datasets: [{ data: Object.values(cats), backgroundColor: ['#4f6d5a','#8c7b6c','#d9c5b2'] }] } });
+
+            // Settlement
+            const trip = db.Trips.find(r => r[0] == tName);
+            if(!trip) return;
+            const mems = trip[3].split(',').map(m => m.trim());
+            let bal = {}; mems.forEach(m => bal[m] = 0);
+            exps.forEach(r => {
+                const amt = Number(r[6]);
+                const ps = r[7].split(',').filter(x=>x); const ms = r[8].split(',').filter(x=>x);
+                ps.forEach(p => bal[p] += amt/ps.length); ms.forEach(m => bal[m] -= amt/ms.length);
+            });
+            document.getElementById('settle-list').innerHTML = Object.entries(bal).map(([m, b]) => `<div class="d-flex justify-content-between"><span>${m}</span><span class="${b>=0?'text-success':'text-danger'}">${b>=0?'應收':'應付'} ${Math.abs(Math.round(b))}</span></div>`).join('');
+        }
+
+        function toggleLoader(show) { document.getElementById('loader').style.display = show ? 'flex' : 'none'; }
+    </script>
+</body>
+</html>
