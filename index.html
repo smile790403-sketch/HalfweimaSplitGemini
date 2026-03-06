@@ -3,44 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>大地分帳 Pro V8</title>
+    <title>大地分帳 V9 穩定版</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
     <style>
         :root { --sage: #4f6d5a; --earth: #8c7b6c; --beige: #f5f5dc; --dark: #2d4a3e; }
-        body { background-color: var(--beige); font-family: -apple-system, sans-serif; padding-bottom: 100px; overscroll-behavior-y: contain; }
+        body { background-color: var(--beige); font-family: sans-serif; padding-bottom: 90px; }
         .app-header { background: var(--dark); color: white; padding: 15px; text-align: center; font-weight: bold; position: sticky; top:0; z-index:1000; }
         .nav-bottom { background: white; border-top: 1px solid #ddd; position: fixed; bottom: 0; width: 100%; display: flex; justify-content: space-around; padding: 10px 0; z-index: 1000; }
         .nav-item { color: #888; text-decoration: none; font-size: 0.7rem; text-align: center; flex:1; cursor: pointer; }
         .nav-item.active { color: var(--sage); font-weight: bold; }
-        .card { border: none; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 15px; background: white; padding: 15px; }
-        .btn-earth { background: var(--sage); color: white; border-radius: 10px; width: 100%; padding: 12px; font-weight: bold; border: none; }
+        .card { border: none; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); margin-bottom: 15px; background: white; padding: 15px; }
+        .btn-earth { background: var(--sage); color: white; border-radius: 10px; width: 100%; padding: 10px; font-weight: bold; border: none; }
         .section { display: none; padding: 15px; }
         .section.active { display: block; }
-        .badge-mem { background: #eee; padding: 6px 12px; border-radius: 20px; margin: 3px; display: inline-block; cursor: pointer; font-size: 0.8rem; }
+        .badge-mem { background: #eee; padding: 5px 10px; border-radius: 20px; margin: 2px; display: inline-block; cursor: pointer; font-size: 0.8rem; border: 1px solid transparent; }
         .badge-mem.active { background: var(--earth); color: white; }
-        .table-area { background: white; border-radius: 12px; padding: 10px; overflow-x: auto; font-size: 0.75rem; }
-        .filter-input { width: 100%; border: 1px solid #eee; border-radius: 4px; font-size: 0.7rem; padding: 2px; }
-        .detail-input-box { background: #fdfdfd; border: 1px dashed #ccc; border-radius: 8px; padding: 10px; margin-top: 5px; }
-        .loading { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(255,255,255,0.8); display:none; align-items:center; justify-content:center; z-index:9999; flex-direction: column; }
+        .table-area { background: white; border-radius: 10px; padding: 10px; overflow-x: auto; font-size: 0.7rem; }
+        .filter-input { width: 100%; border: 1px solid #ddd; border-radius: 4px; font-size: 0.65rem; margin-bottom: 5px; }
+        .loading { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(255,255,255,0.7); display:none; align-items:center; justify-content:center; z-index:9999; }
     </style>
 </head>
 <body>
 
-    <div class="loading" id="loader"><div class="spinner-border text-success"></div><div class="mt-2">更新數據中...</div></div>
-    <div class="app-header" id="refresh-zone">大地分帳 Pro V8</div>
+    <div class="loading" id="loader">同步中...</div>
+    <div class="app-header" onclick="fetchData()">大地分帳 Pro V9 (點此重整)</div>
 
     <div id="sec-trip" class="section">
         <div class="card">
-            <h6 id="trip-title" class="fw-bold mb-3">✈️ 旅程設定</h6>
+            <h6 id="t-title">✈️ 旅程設定</h6>
             <input type="hidden" id="t_rowIdx">
             <input type="text" id="t_name" class="form-control mb-2" placeholder="旅程名稱">
-            <div class="row g-2 mb-2">
-                <div class="col"><input type="date" id="t_start" class="form-control"></div>
-                <div class="col"><input type="date" id="t_end" class="form-control"></div>
-            </div>
-            <input type="text" id="t_members" class="form-control mb-3" placeholder="參與者 (逗號隔開)">
+            <div class="row g-2 mb-2"><div class="col"><input type="date" id="t_start" class="form-control"></div><div class="col"><input type="date" id="t_end" class="form-control"></div></div>
+            <input type="text" id="t_members" class="form-control mb-2" placeholder="參與者 (逗號隔開)">
+            <input type="text" id="t_base" class="form-control mb-2" value="TWD">
             <button class="btn btn-earth" onclick="saveTrip()">儲存</button>
         </div>
         <div id="trip-list-area"></div>
@@ -48,22 +44,13 @@
 
     <div id="sec-ex" class="section">
         <div class="card">
-            <h6 id="ex-title" class="fw-bold mb-3">💱 換匯紀錄</h6>
+            <h6 id="ex-title">💱 換匯紀錄</h6>
             <input type="hidden" id="ex_rowIdx">
             <select id="ex_trip" class="form-select mb-2" onchange="persistTrip(this.value); updateExList();"></select>
-            <div class="row g-2 mb-2">
-                <div class="col-6"><input type="date" id="ex_date" class="form-control"></div>
-                <div class="col-6"><input type="text" id="ex_loc" class="form-control" placeholder="換匯所"></div>
-            </div>
-            <div class="row g-2 mb-2">
-                <div class="col-4"><input type="text" id="ex_cur" class="form-control" placeholder="幣別" oninput="calcExTwd()"></div>
-                <div class="col-8"><input type="number" id="ex_rate" class="form-control" placeholder="匯率 (1外幣=?台幣)" oninput="calcExTwd()"></div>
-            </div>
-            <div class="row g-2 mb-2">
-                <div class="col-6"><input type="number" id="ex_amt" class="form-control" placeholder="金額" oninput="calcExTwd()"></div>
-                <div class="col-6"><input type="text" id="ex_src" class="form-control" placeholder="來源 (如現金)"></div>
-            </div>
-            <div class="small mb-3">台幣: <span id="ex_twd_val" class="fw-bold text-danger">0</span></div>
+            <div class="row g-2 mb-2"><div class="col-6"><input type="date" id="ex_date" class="form-control"></div><div class="col-6"><input type="text" id="ex_loc" class="form-control" placeholder="換匯所"></div></div>
+            <div class="row g-2 mb-2"><div class="col-4"><input type="text" id="ex_cur" class="form-control" placeholder="幣別" oninput="calcExTwd()"></div><div class="col-8"><input type="number" id="ex_rate" class="form-control" placeholder="匯率" oninput="calcExTwd()"></div></div>
+            <div class="row g-2 mb-2"><div class="col-6"><input type="number" id="ex_amt" class="form-control" placeholder="金額" oninput="calcExTwd()"></div><div class="col-6"><input type="text" id="ex_src" class="form-control" placeholder="來源"></div></div>
+            <div class="small mb-3">台幣: <span id="ex_twd_val" class="fw-bold">0</span></div>
             <button class="btn btn-earth" onclick="saveEx()">儲存換匯</button>
         </div>
         <div id="ex-list-area" class="table-area"></div>
@@ -71,50 +58,41 @@
 
     <div id="sec-exp" class="section">
         <div class="card">
-            <h6 id="exp-title" class="fw-bold mb-2">📝 記帳支出</h6>
+            <h6 id="exp-title">📝 記帳支出</h6>
             <input type="hidden" id="e_rowIdx">
             <select id="e_trip" class="form-select mb-2" onchange="persistTrip(this.value); syncExpUI();"></select>
             <div class="row g-2 mb-2">
                 <div class="col-6"><input type="date" id="e_date" class="form-control"></div>
-                <div class="col-6"><select id="e_cat" class="form-select"><option>飲食(餐)</option><option>交通</option><option>住宿</option><option>玩樂</option><option>其他</option></select></div>
+                <div class="col-6"><select id="e_cat" class="form-select"><option>機票</option><option>電信</option><option>交通</option><option>住宿</option><option>飲食(餐)</option><option>零食點心飲料</option><option>玩樂</option><option>明信片</option><option>郵票</option><option>紀念品(禮用品)</option><option>其他</option><option>團費</option><option>紀念品(食品類)</option><option>保險</option><option>治裝</option></select></div>
             </div>
             <input type="text" id="e_item" class="form-control mb-2" placeholder="品項名稱">
             <div class="row g-2 mb-1">
                 <div class="col-7"><input type="number" id="e_amt" class="form-control" placeholder="金額" oninput="calcTwd()"></div>
                 <div class="col-5"><select id="e_cur" class="form-select" onchange="calcTwd()"></select></div>
             </div>
-            <div class="small text-muted mb-2">台幣: <span id="e_twd_val" class="fw-bold">0</span></div>
+            <div class="small mb-2">台幣預估: <span id="e_twd_val" class="fw-bold">0</span></div>
             
-            <label class="small fw-bold">誰付錢？(可多選)</label>
-            <div id="p-box" class="mb-2"></div>
-            <div id="p-details" class="detail-input-box" style="display:none;"></div>
+            <label class="small fw-bold">付款人:</label><div id="p-box" class="mb-2"></div>
+            <div id="p-details" style="display:none;" class="bg-light p-2 mb-2 rounded"></div>
 
-            <label class="small fw-bold">誰分攤？</label>
-            <div id="m-box" class="mb-2"></div>
-            <select id="e_split_type" class="form-select form-select-sm mb-2" onchange="toggleSplitDetails()">
-                <option value="平分">平分</option><option value="分攤金額">分攤特定金額</option>
-            </select>
-            <div id="m-details" class="detail-input-box" style="display:none;"></div>
+            <label class="small fw-bold">參與人:</label><div id="m-box" class="mb-2"></div>
+            <select id="e_split" class="form-select form-select-sm mb-2" onchange="updateSplitUI()"><option value="平分">平分</option><option value="分攤金額">分攤金額</option></select>
+            <div id="m-details" style="display:none;" class="bg-light p-2 mb-2 rounded"></div>
 
-            <button class="btn btn-earth mt-3" onclick="saveExp()">儲存記帳</button>
+            <div id="split-summary" class="small text-primary fw-bold mt-1"></div>
+            <button class="btn btn-earth mt-2" onclick="saveExp()">儲存記帳</button>
         </div>
         <div id="exp-list-area" class="table-area"></div>
     </div>
 
     <div id="sec-ana" class="section">
-        <div class="card text-center">
+        <div class="card">
             <select id="ana_trip" class="form-select mb-3" onchange="persistTrip(this.value); renderCharts();"></select>
-            <div style="position:relative; height:250px;">
-                <canvas id="anaPie"></canvas>
-                <div id="pie-center-text" style="position:absolute; top:55%; left:50%; transform:translate(-50%,-50%); font-weight:bold;"></div>
-            </div>
+            <div style="height:300px;"><canvas id="anaPie"></canvas></div>
             <div class="mt-4"><canvas id="anaBar"></canvas></div>
             <hr>
-            <div class="d-flex justify-content-between align-items-center mb-2">
-                <h6 class="mb-0 fw-bold">💰 結算清單</h6>
-                <button class="btn btn-sm btn-outline-danger" onclick="settleAll()">Settle Up</button>
-            </div>
-            <div id="settle-list" class="small p-3 bg-light rounded text-start"></div>
+            <div class="d-flex justify-content-between"><h6>清算結果</h6><button class="btn btn-sm btn-outline-danger" onclick="settleAll()">Settle Up</button></div>
+            <div id="settle-list" class="small p-2 bg-light mt-2 rounded"></div>
         </div>
     </div>
 
@@ -130,25 +108,22 @@
         let db = { Trips: [], Exchange: [], Expenses: [] };
         let charts = {};
 
-        window.onload = async () => {
-            await fetchData();
-            const lastTab = localStorage.getItem('activeTab') || 'trip';
-            showSec(lastTab);
-            setupPullToRefresh();
-        };
+        window.onload = async () => { await fetchData(); showSec(localStorage.getItem('activeTab') || 'trip'); };
 
         async function fetchData() {
             toggleLoader(true);
             try {
                 const res = await fetch(API_URL);
                 db = await res.json();
-                renderCommonUI();
-            } catch (e) { console.error(e); }
+                const options = db.Trips.slice(1).map(r => `<option value="${r[0]}">${r[0]}</option>`).join('');
+                ['ex_trip', 'e_trip', 'ana_trip'].forEach(id => document.getElementById(id).innerHTML = options);
+                updateTripList();
+            } catch (e) { alert("讀取失敗"); }
             toggleLoader(false);
         }
 
         function toggleLoader(s) { document.getElementById('loader').style.display = s ? 'flex' : 'none'; }
-        function persistTrip(val) { localStorage.setItem('selectedTrip', val); }
+        function persistTrip(v) { localStorage.setItem('selectedTrip', v); }
 
         function showSec(id) {
             document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
@@ -156,79 +131,91 @@
             document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
             document.getElementById('nav-' + id).classList.add('active');
             localStorage.setItem('activeTab', id);
-            
             const lastTrip = localStorage.getItem('selectedTrip');
-            if(lastTrip) {
-                document.getElementById('ex_trip').value = lastTrip;
-                document.getElementById('e_trip').value = lastTrip;
-                document.getElementById('ana_trip').value = lastTrip;
-            }
+            if(lastTrip) { ['ex_trip', 'e_trip', 'ana_trip'].forEach(i => document.getElementById(i).value = lastTrip); }
             if(id === 'ex') updateExList();
             if(id === 'exp') syncExpUI();
             if(id === 'ana') renderCharts();
         }
 
-        function renderCommonUI() {
-            const options = db.Trips.slice(1).map(r => `<option value="${r[0]}">${r[0]}</option>`).join('');
-            ['ex_trip', 'e_trip', 'ana_trip'].forEach(id => document.getElementById(id).innerHTML = options);
-            updateTripList();
-        }
-
-        // --- 換匯邏輯 ---
-        function calcExTwd() {
-            const r = document.getElementById('ex_rate').value;
-            const a = document.getElementById('ex_amt').value;
-            document.getElementById('ex_twd_val').innerText = (r && a) ? Math.round(r * a) : 0;
+        // --- 旅程 & 換匯列表 (修復 V8 不顯示問題) ---
+        function updateTripList() {
+            document.getElementById('trip-list-area').innerHTML = db.Trips.slice(1).map((r, i) => `
+                <div class="card p-2 mb-2 d-flex justify-content-between flex-row align-items-center">
+                    <div><b>${r[0]}</b><br><small>${r[1]}~${r[2]}</small></div>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="editTrip(${i+1})">✏️ 編輯</button>
+                </div>
+            `).join('');
         }
         function updateExList() {
-            const curTrip = document.getElementById('ex_trip').value;
-            const data = db.Exchange.slice(1).map((r, i) => ({r, i: i+1})).filter(o => o.r[0] == curTrip);
-            let h = `<table class="table table-sm"><thead><tr><th>日期</th><th>幣</th><th>匯率</th><th>台幣</th><th>來源</th><th>✏️</th></tr></thead><tbody>`;
-            data.forEach(o => {
-                h += `<tr><td>${o.r[1]}</td><td>${o.r[3]}</td><td>${o.r[4]}</td><td>${o.r[6]}</td><td>${o.r[7]}</td><td><span onclick="editEx(${o.i})">✏️</span></td></tr>`;
-            });
-            document.getElementById('ex-list-area').innerHTML = h + "</tbody></table>";
+            const cur = document.getElementById('ex_trip').value;
+            const filtered = db.Exchange.slice(1).map((r, i) => ({r, i: i+1})).filter(o => o.r[0] == cur);
+            document.getElementById('ex-list-area').innerHTML = `<table class="table table-sm"><thead><tr><th>日期</th><th>幣</th><th>匯率</th><th>台幣</th><th>來源</th><th>✏️</th></tr></thead><tbody>` + 
+                filtered.map(o => `<tr><td>${o.r[1]}</td><td>${o.r[3]}</td><td>${o.r[4]}</td><td>${o.r[6]}</td><td>${o.r[7]}</td><td><span onclick="editEx(${o.i})">✏️</span></td></tr>`).join('') + `</tbody></table>`;
         }
-        // ... (editEx, saveEx 略，邏輯同 V7)
 
-        // --- 記帳複雜邏輯 ---
-        function syncExpUI() { updateCurDropdown(); syncMembers(); updateExpList(); }
-        function updateCurDropdown() {
-            const trip = document.getElementById('e_trip').value;
-            let curs = ["TWD"];
-            db.Exchange.slice(1).forEach(r => { if(r[0] == trip) curs.push(r[3]); });
-            document.getElementById('e_cur').innerHTML = [...new Set(curs)].map(c => `<option value="${c}">${c}</option>`).join('');
-        }
-        function syncMembers() {
+        // --- 記帳分帳邏輯 (核心需求修正) ---
+        function syncExpUI() {
             const trip = db.Trips.find(r => r[0] == document.getElementById('e_trip').value);
             if(!trip) return;
             const mems = trip[3].split(',').map(m => m.trim());
-            const badgeHtml = (cls) => mems.map(m => `<span class="badge-mem ${cls}" onclick="handleBadge(this, '${cls}')">${m}</span>`).join('');
-            document.getElementById('p-box').innerHTML = badgeHtml('p-b');
-            document.getElementById('m-box').innerHTML = badgeHtml('m-b');
+            const badge = (cls) => mems.map(m => `<span class="badge-mem ${cls}" onclick="handleBadge(this, '${cls}')">${m}</span>`).join('');
+            document.getElementById('p-box').innerHTML = badge('p-b');
+            document.getElementById('m-box').innerHTML = badge('m-b');
+            
+            // 幣別選單修復
+            let curs = ["TWD"]; db.Exchange.slice(1).forEach(r => { if(r[0] == trip[0]) curs.push(r[3]); });
+            document.getElementById('e_cur').innerHTML = [...new Set(curs)].map(c => `<option value="${c}">${c}</option>`).join('');
+            updateExpList();
         }
 
-        function handleBadge(el, cls) {
-            el.classList.toggle('active');
-            if(cls === 'p-b') toggleDetailInputs('p');
-            if(cls === 'm-b') toggleDetailInputs('m');
+        function handleBadge(el, cls) { el.classList.toggle('active'); updateSplitUI(); }
+
+        function updateSplitUI() {
+            const ps = Array.from(document.querySelectorAll('.p-b.active')).map(e => e.innerText);
+            const ms = Array.from(document.querySelectorAll('.m-b.active')).map(e => e.innerText);
+            const type = document.getElementById('e_split').value;
+            const total = document.getElementById('e_twd_val').innerText;
+
+            // (1) 付款詳情：僅多人選才出現
+            const pBox = document.getElementById('p-details');
+            if(ps.length > 1) {
+                pBox.innerHTML = `多人付款金額分配:<br>` + ps.map(n => `<div class="input-group input-group-sm mb-1"><span class="input-group-text">${n}</span><input type="number" class="form-control p-val" data-mem="${n}" oninput="calcSplitSummary()"></div>`).join('');
+                pBox.style.display = 'block';
+            } else { pBox.style.display = 'none'; }
+
+            // (2) 分攤詳情：僅分攤金額且多人選才出現
+            const mBox = document.getElementById('m-details');
+            if(type === '分攤金額' && ms.length > 0 && !(ms.length === 1 && ps.length === 1 && ms[0] === ps[0])) {
+                mBox.innerHTML = `分攤金額分配:<br>` + ms.map(n => `<div class="input-group input-group-sm mb-1"><span class="input-group-text">${n}</span><input type="number" class="form-control m-val" data-mem="${n}" oninput="calcSplitSummary()"></div>`).join('');
+                mBox.style.display = 'block';
+            } else { mBox.style.display = 'none'; }
+            
+            calcSplitSummary();
         }
 
-        function toggleDetailInputs(type) {
-            const active = Array.from(document.querySelectorAll(`.${type}-b.active`));
-            const box = document.getElementById(`${type}-details`);
-            if(active.length > 1 || (type === 'm' && document.getElementById('e_split_type').value === '分攤金額')) {
-                box.innerHTML = active.map(el => `
-                    <div class="input-group input-group-sm mb-1">
-                        <span class="input-group-text">${el.innerText}</span>
-                        <input type="number" class="form-control ${type}-val" data-mem="${el.innerText}" placeholder="金額">
-                    </div>
-                `).join('');
-                box.style.display = 'block';
-            } else { box.style.display = 'none'; }
+        function calcSplitSummary() {
+            const ps = Array.from(document.querySelectorAll('.p-b.active')).map(e => e.innerText);
+            const ms = Array.from(document.querySelectorAll('.m-b.active')).map(e => e.innerText);
+            const type = document.getElementById('e_split').value;
+            const total = Number(document.getElementById('e_twd_val').innerText);
+            let txt = "";
+            if(ps.length > 0 && ms.length > 0) {
+                if(type === '平分') txt = `每人分攤: ${Math.round(total/ms.length)} TWD`;
+            }
+            document.getElementById('split-summary').innerText = txt;
         }
 
-        function toggleSplitDetails() { toggleDetailInputs('m'); }
+        function calcTwd() {
+            const cur = document.getElementById('e_cur').value;
+            const amt = Number(document.getElementById('e_amt').value);
+            if(cur === "TWD") { document.getElementById('e_twd_val').innerText = amt; }
+            else {
+                const ex = db.Exchange.slice(1).reverse().find(r => r[0] == document.getElementById('e_trip').value && r[3] == cur);
+                document.getElementById('e_twd_val').innerText = ex ? Math.round(amt * ex[4]) : 0;
+            }
+            updateSplitUI();
+        }
 
         function updateExpList() {
             const curTrip = document.getElementById('e_trip').value;
@@ -237,119 +224,89 @@
                 <th><input class="filter-input" placeholder="日期" onkeyup="filterTable(0,this)"></th>
                 <th><input class="filter-input" placeholder="類別" onkeyup="filterTable(1,this)"></th>
                 <th><input class="filter-input" placeholder="品項" onkeyup="filterTable(2,this)"></th>
-                <th>台幣</th><th>參與人</th><th>✏️</th></tr></thead><tbody>`;
-            data.forEach(o => {
-                h += `<tr><td>${o.r[1]}</td><td>${o.r[2]}</td><td>${o.r[3]}</td><td>${o.r[6]}</td><td>${o.r[8]}</td><td><span onclick="editExp(${o.i})">✏️</span></td></tr>`;
-            });
-            document.getElementById('exp-list-area').innerHTML = h + "</tbody></table>";
+                <th>台幣</th><th>參與者</th><th>✏️</th></tr></thead><tbody>`;
+            h += data.map(o => `<tr><td>${o.r[1]}</td><td>${o.r[2]}</td><td>${o.r[3]}</td><td>${o.r[6]}</td><td>${o.r[8]}</td><td><span onclick="editExp(${o.i})">✏️</span></td></tr>`).join('') + `</tbody></table>`;
+            document.getElementById('exp-list-area').innerHTML = h;
         }
-        
         function filterTable(idx, el) {
             const v = el.value.toLowerCase();
-            const rows = document.querySelectorAll("#expTable tbody tr");
-            rows.forEach(r => r.style.display = r.cells[idx].innerText.toLowerCase().includes(v) ? "" : "none");
+            document.querySelectorAll("#expTable tbody tr").forEach(r => r.style.display = r.cells[idx].innerText.toLowerCase().includes(v) ? "" : "none");
         }
 
-        async function saveExp() {
-            const pData = Array.from(document.querySelectorAll('.p-val')).map(i => `${i.dataset.mem}:${i.value}`).join('|');
-            const pNames = Array.from(document.querySelectorAll('.p-b.active')).map(el => el.innerText).join(',');
-            const mData = Array.from(document.querySelectorAll('.m-val')).map(i => `${i.dataset.mem}:${i.value}`).join('|');
-            const mNames = Array.from(document.querySelectorAll('.m-b.active')).map(el => el.innerText).join(',');
-            
-            // 存入格式：[付款細節][分攤細節][分攤類型] 放在備註或特定欄位
-            const complexNote = `[P:${pData}][M:${mData}]`;
-            const data = [
-                document.getElementById('e_trip').value, document.getElementById('e_date').value, 
-                document.getElementById('e_cat').value, document.getElementById('e_item').value, 
-                document.getElementById('e_amt').value, document.getElementById('e_cur').value, 
-                document.getElementById('e_twd_val').innerText, pNames, mNames, 
-                document.getElementById('e_split_type').value, "", complexNote
-            ];
-            await postData('Expenses', data, document.getElementById('e_rowIdx').value);
+        // --- 編輯功能修復 ---
+        function editTrip(idx) {
+            const r = db.Trips[idx]; document.getElementById('t_rowIdx').value = idx; document.getElementById('t_name').value = r[0]; document.getElementById('t_start').value = r[1]; document.getElementById('t_end').value = r[2]; document.getElementById('t_members').value = r[3]; window.scrollTo(0,0);
+        }
+        function editEx(idx) {
+            const r = db.Exchange[idx]; document.getElementById('ex_rowIdx').value = idx; document.getElementById('ex_date').value = r[1]; document.getElementById('ex_loc').value = r[2]; document.getElementById('ex_cur').value = r[3]; document.getElementById('ex_rate').value = r[4]; document.getElementById('ex_amt').value = r[5]; document.getElementById('ex_src').value = r[7]; calcExTwd(); window.scrollTo(0,0);
+        }
+        function editExp(idx) {
+            const r = db.Expenses[idx]; document.getElementById('e_rowIdx').value = idx; document.getElementById('e_date').value = r[1]; document.getElementById('e_cat').value = r[2]; document.getElementById('e_item').value = r[3]; document.getElementById('e_amt').value = r[4]; document.getElementById('e_cur').value = r[5]; calcTwd(); window.scrollTo(0,0);
         }
 
-        // --- 分析圖表 (中心文字 + 疊加柱狀) ---
+        // --- 分析 & 清算 (精確淨額邏輯) ---
         function renderCharts() {
-            const tName = document.getElementById('ana_trip').value;
-            const allExps = db.Expenses.slice(1).filter(r => r[0] == tName);
-            const unsettledExps = allExps.filter(r => r[12] !== "已結清");
-            const trip = db.Trips.find(r => r[0] == tName);
+            const t = document.getElementById('ana_trip').value;
+            const all = db.Expenses.slice(1).filter(r => r[0] == t);
+            const trip = db.Trips.find(r => r[0] == t);
             if(!trip) return;
             const mems = trip[3].split(',').map(m => m.trim());
-
-            // 1. 圓餅圖 (包含全旅程數據)
+            
+            // 圓餅圖
             const cats = {}; let total = 0;
-            allExps.forEach(r => { cats[r[2]] = (cats[r[2]] || 0) + Number(r[6]); total += Number(r[6]); });
-            document.getElementById('pie-center-text').innerHTML = `Total<br>${Math.round(total)}`;
-            
-            drawPieChart('anaPie', Object.keys(cats), Object.values(cats), total);
+            all.forEach(r => { cats[r[2]] = (cats[r[2]] || 0) + Number(r[6]); total += Number(r[6]); });
+            drawPie('anaPie', Object.keys(cats), Object.values(cats), total);
 
-            // 2. 每人每日柱狀圖 (人為柱，類別疊加)
-            const personCat = {}; mems.forEach(m => personCat[m] = {});
-            allExps.forEach(r => {
-                const c = r[2]; const amt = Number(r[6]); const ms = r[8].split(',');
-                ms.forEach(m => { if(personCat[m]) personCat[m][c] = (personCat[m][c] || 0) + (amt/ms.length); });
+            // 柱狀圖 (每人一柱)
+            const personData = mems.map(m => {
+                let sum = 0;
+                all.forEach(r => { if(r[8].split(',').includes(m)) sum += Number(r[6]) / r[8].split(',').length; });
+                return Math.round(sum);
             });
-            const allCatNames = [...new Set(allExps.map(r => r[2]))];
-            const barDs = allCatNames.map(c => ({ label: c, data: mems.map(m => Math.round(personCat[m][c] || 0)), backgroundColor: getRandomColor() }));
-            
-            if(charts.anaBar) charts.anaBar.destroy();
-            charts.anaBar = new Chart(document.getElementById('anaBar'), {
-                type:'bar', data: { labels: mems, datasets: barDs }, options: { scales: { x:{stacked:true}, y:{stacked:true} } }
-            });
+            drawBar('anaBar', mems, personData);
 
-            // 3. 結算 (僅計未結清)
+            // 清算 (A付100 B付50 平分範例邏輯)
             let bal = {}; mems.forEach(m => bal[m] = 0);
-            unsettledExps.forEach(r => {
+            all.filter(r => r[12] !== "已結清").forEach(r => {
                 const twd = Number(r[6]);
-                // 付款解析
+                const ps = r[7].split(','); const ms = r[8].split(',');
+                // 付款 (增加餘額)
                 if(r[11].includes('[P:')) {
-                    const pMatch = r[11].match(/\[P:(.*?)\]/);
-                    pMatch[1].split('|').forEach(pair => { const [n,v] = pair.split(':'); if(bal[n]!==undefined) bal[n] += Number(v || 0); });
+                    r[11].match(/\[P:(.*?)\]/)[1].split('|').forEach(p => { const [n,v]=p.split(':'); bal[n]+=Number(v); });
                 } else { bal[r[7]] += twd; }
-                // 分攤解析
-                const ms = r[8].split(',');
-                if(r[9] === '分攤金額') {
-                    const mMatch = r[11].match(/\[M:(.*?)\]/);
-                    mMatch[1].split('|').forEach(pair => { const [n,v] = pair.split(':'); if(bal[n]!==undefined) bal[n] -= Number(v || 0); });
-                } else { ms.forEach(m => { if(bal[m]!==undefined) bal[m] -= twd/ms.length; }); }
+                // 支出 (扣除餘額)
+                if(r[11].includes('[M:')) {
+                    r[11].match(/\[M:(.*?)\]/)[1].split('|').forEach(p => { const [n,v]=p.split(':'); bal[n]-=Number(v); });
+                } else { ms.forEach(m => bal[m] -= twd/ms.length); }
             });
-            document.getElementById('settle-list').innerHTML = Object.entries(bal).map(([m, b]) => `<div class="d-flex justify-content-between"><span>${m}</span><span class="${b>=0?'text-success':'text-danger'}">${b>=0?'應收':'應付'} ${Math.abs(Math.round(b))}</span></div>`).join('');
+            document.getElementById('settle-list').innerHTML = Object.entries(bal).map(([m,b]) => `<div class="d-flex justify-content-between"><span>${m}</span><span class="${b>=0?'text-success':'text-danger'}">${b>=0?'應收':'應付'} ${Math.abs(Math.round(b))}</span></div>`).join('');
         }
 
-        function drawPieChart(id, labels, data, total) {
+        function drawPie(id, labels, data, total) {
             if(charts[id]) charts[id].destroy();
-            charts[id] = new Chart(document.getElementById(id), {
-                type: 'doughnut',
-                data: { labels, datasets: [{ data, backgroundColor: ['#4f6d5a','#8c7b6c','#d9c5b2','#b66a50','#2d4a3e'] }] },
-                options: { 
-                    cutout: '70%',
-                    plugins: { 
-                        legend: { position: 'bottom', labels: { boxWidth:12, font:{size:10} } },
-                        tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${ctx.raw} (${Math.round(ctx.raw/total*100)}%)` } }
-                    }
-                }
-            });
+            charts[id] = new Chart(document.getElementById(id), { type: 'doughnut', data: { labels, datasets: [{ data, backgroundColor: ['#4f6d5a','#8c7b6c','#d9c5b2','#b66a50','#2d4a3e'] }] }, options: { plugins: { legend: { position:'bottom' }, tooltip: { callbacks: { label: (c) => `${c.label}: ${c.raw} (${Math.round(c.raw/total*100)}%)` } } } } });
+        }
+        function drawBar(id, labels, data) {
+            if(charts[id]) charts[id].destroy();
+            charts[id] = new Chart(document.getElementById(id), { type:'bar', data: { labels, datasets:[{ label:'總支出分攤', data, backgroundColor: '#8c7b6c' }] } });
         }
 
-        // 下拉重整
-        function setupPullToRefresh() {
-            let startY = 0;
-            document.getElementById('refresh-zone').addEventListener('touchstart', e => startY = e.touches[0].pageY);
-            document.getElementById('refresh-zone').addEventListener('touchmove', e => {
-                if(e.touches[0].pageY > startY + 50) { fetchData(); startY = 9999; }
-            });
-        }
-
-        async function postData(sheet, data, rowIdx, methodOverride = null) {
+        async function postData(sheet, data, rowIdx, override = null) {
             toggleLoader(true);
-            const method = methodOverride || (rowIdx ? "update" : "append");
+            const method = override || (rowIdx ? "update" : "append");
             await fetch(API_URL, { method: 'POST', body: JSON.stringify({sheet, method, data, rowIdx, tripName: localStorage.getItem('selectedTrip')}) });
             await fetchData();
             toggleLoader(false);
         }
-
-        function getRandomColor() { return '#' + Math.floor(Math.random()*16777215).toString(16); }
+        async function saveTrip() { await postData('Trips', [document.getElementById('t_name').value, document.getElementById('t_start').value, document.getElementById('t_end').value, document.getElementById('t_members').value, document.getElementById('t_base').value], document.getElementById('t_rowIdx').value); }
+        async function saveEx() { await postData('Exchange', [document.getElementById('ex_trip').value, document.getElementById('ex_date').value, document.getElementById('ex_loc').value, document.getElementById('ex_cur').value, document.getElementById('ex_rate').value, document.getElementById('ex_amt').value, document.getElementById('ex_twd_val').innerText, document.getElementById('ex_src').value], document.getElementById('ex_rowIdx').value); }
+        async function saveExp() {
+            const pVal = Array.from(document.querySelectorAll('.p-val')).map(i => `${i.dataset.mem}:${i.value}`).join('|');
+            const mVal = Array.from(document.querySelectorAll('.m-val')).map(i => `${i.dataset.mem}:${i.value}`).join('|');
+            const data = [document.getElementById('e_trip').value, document.getElementById('e_date').value, document.getElementById('e_cat').value, document.getElementById('e_item').value, document.getElementById('e_amt').value, document.getElementById('e_cur').value, document.getElementById('e_twd_val').innerText, Array.from(document.querySelectorAll('.p-b.active')).map(e => e.innerText).join(','), Array.from(document.querySelectorAll('.m-b.active')).map(e => e.innerText).join(','), document.getElementById('e_split').value, "", `[P:${pVal}][M:${mVal}]` ];
+            await postData('Expenses', data, document.getElementById('e_rowIdx').value);
+        }
+        async function settleAll() { if(confirm("結清將重設清算清單，但保留分析圖表？")) await postData('Expenses', [], null, 'settleAll'); }
     </script>
 </body>
 </html>
