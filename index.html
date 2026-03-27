@@ -329,71 +329,26 @@
             });
 
             // 3. 淨額清算 (需求 4 & 6)
-          // 2. 清算計算 (同步記帳列表的債務邏輯)
-// 2. 清算計算 (完全同步記帳列表的點對點債務邏輯)
-let pairDebts = {}; // 格式: { "債務人": { "債主": 金額 } }
+            let bal = {}; mems.forEach(m => bal[m] = 0);
+            exps.forEach(r => {
+                const twd = parseFloat(r[6]) || 0;
+                const rate = twd / (parseFloat(r[4]) || 1);
+                // 付款 (+)
+                if(r[13].includes('[P:')) {
+                    r[13].match(/\[P:(.*?)\]/)[1].split('|').forEach(s => { const [n,v]=s.split(':'); if(bal[n]!==undefined) bal[n]+=parseFloat(v)*rate; });
+                } else { if(bal[r[7]]!==undefined) bal[r[7]] += twd; }
+                // 分攤 (-)
+                const ms = r[8].split(',');
+                if(r[9] === '分攤金額' && r[13].includes('[M:')) {
+                    r[13].match(/\[M:(.*?)\]/)[1].split('|').forEach(s => { const [n,v]=s.split(':'); if(bal[n]!==undefined) bal[n]-=parseFloat(v)*rate; });
+                } else { ms.forEach(m => { if(bal[m]!==undefined) bal[m] -= twd / ms.length; }); }
+            });
 
-exps.forEach(r => {
-    const twd = parseFloat(r[6]) || 0;
-    const ratio = twd / (parseFloat(r[4]) || 1);
-    const meta = r[13] || "";
-    const payers = r[7].split(',').map(n => n.trim());
-    const splitters = r[8].split(',').map(n => n.trim());
-
-    // 只有在「單一付款人」時，採用您的債務關係邏輯 (需求 1)
-    if (payers.length === 1) {
-        const thePayer = payers[0];
-        splitters.forEach(m => {
-            const debtor = m.trim();
-            if (debtor !== thePayer) {
-                // 計算分攤金額
-                let share = 0;
-                if (r[9] === '分攤金額' && meta.includes('[M:')) {
-                    const mMatch = meta.match(/\[M:(.*?)\]/);
-                    if (mMatch) mMatch[1].split('|').forEach(s => {
-                        const [n, v] = s.split(':');
-                        if (n.trim() === debtor) share = parseFloat(v) * ratio;
-                    });
-                } else {
-                    share = twd / splitters.length;
-                }
-
-                if (share > 0) {
-                    if (!pairDebts[debtor]) pairDebts[debtor] = {};
-                    pairDebts[debtor][thePayer] = (pairDebts[debtor][thePayer] || 0) + share;
-                }
-            }
-        });
-    }
-});
-
-// 3. 債務兩兩抵銷 (例如 A欠B 100, B欠A 40 -> A欠B 60)
-let finalSettlements = [];
-const people = Object.keys(pairDebts);
-people.forEach(debtor => {
-    for (let creditor in pairDebts[debtor]) {
-        let amt = pairDebts[debtor][creditor];
-        let reverseAmt = (pairDebts[creditor] && pairDebts[creditor][debtor]) ? pairDebts[creditor][debtor] : 0;
-
-        if (amt > reverseAmt) {
-            finalSettlements.push({ from: debtor, to: creditor, amt: amt - reverseAmt });
-            if (pairDebts[creditor]) delete pairDebts[creditor][debtor]; // 避免重複計算
-        } else if (reverseAmt > amt) {
-            finalSettlements.push({ from: creditor, to: debtor, amt: reverseAmt - amt });
-            if (pairDebts[creditor]) delete pairDebts[creditor][debtor];
-        }
-    }
-});
-
-// 4. 顯示結果 (將結果轉為 HTML)
-let sHtml = finalSettlements
-    .filter(s => s.amt > 0.5) // 過濾掉微小誤差
-    .map(s => `<div class="d-flex justify-content-between border-bottom py-2">
-                <span>💸 <b>${s.from}</b> 應支付給 <b>${s.to}</b></span>
-                <span class="text-danger fw-bold">${Math.round(s.amt).toLocaleString()} TWD</span>
-               </div>`).join('');
-
-document.getElementById('settle-list').innerHTML = sHtml || "🎉 帳目已結清！";
+            let debtors = [], creditors = [];
+            Object.entries(bal).forEach(([n, b]) => {
+                if (b < -1.5) debtors.push({n, amt: Math.abs(b)});
+                else if (b > 1.5) creditors.push({n, amt: b});
+            });
 
             let sHtml = "";
             while(debtors.length > 0 && creditors.length > 0) {
