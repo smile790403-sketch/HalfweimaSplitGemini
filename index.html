@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>大地分帳 V12.5 專業分帳版</title>
+    <title>維馬旅遊帳簿 V12.6 專業修正版</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -20,7 +20,7 @@
         .badge-mem { background: #eee; padding: 5px 12px; border-radius: 20px; margin: 3px; display: inline-block; cursor: pointer; font-size: 0.85rem; border: 1px solid #ddd; }
         .badge-mem.active { background: var(--earth); color: white; border-color: var(--earth); }
         .edit-btn { cursor: pointer; color: var(--earth); font-weight: bold; margin-left: 5px; }
-        .del-btn { cursor: pointer; color: #dc3545; font-weight: bold; margin-left: 5px; }
+        .del-btn { cursor: pointer; color: #dc3545; font-weight: bold; margin-left: 8px; }
         .loading { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(255,255,255,0.8); display:none; align-items:center; justify-content:center; z-index:9999; flex-direction: column; }
         .chart-container { position: relative; height: 250px; margin-bottom: 30px; }
         .pie-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -20%); text-align: center; pointer-events: none; line-height: 1.2; }
@@ -30,7 +30,7 @@
 <body>
 
     <div class="loading" id="loader"><div class="spinner-border text-success mb-2"></div>同步中...</div>
-    <div class="app-header" onclick="fetchData()">🌏 大地分帳 V12 (分帳強化版)</div>
+    <div class="app-header" onclick="fetchData()">🌏 維馬旅遊帳簿 V12 (專業修正版)</div>
 
     <div id="sec-trip" class="section">
         <div class="card">
@@ -90,7 +90,7 @@
             <div id="m-details" style="display:none;" class="bg-light p-2 mb-2 rounded"></div>
 
             <div class="row g-2 mb-2">
-                <div class="col-6"><select id="e_pay_method" class="form-select"><option>💵 現金</option><option>💳 信用卡</option><option>📱 行動支付</option><option>🏦 轉帳</option></select></div>
+                <div class="col-6"><select id="e_pay_method" class="form-select"><option>💵 現金</option><option>💳 信用卡</option><option>📱 行動支付</option><option>🏦 轉帳</option><option>🪪交通卡</option></select></div>
                 <div class="col-6"><input type="text" id="e_note" class="form-control" placeholder="備註"></div>
             </div>
             <button class="btn btn-earth mt-2" onclick="saveExp()">儲存記帳</button>
@@ -102,9 +102,11 @@
         <div class="card">
             <select id="ana_trip" class="form-select mb-3" onchange="syncTrip(this.value); renderCharts();"></select>
             
-            <p class="small fw-bold text-center mb-3">個人支出分析 (TWD)</p>
-            <div id="pie-container"></div> <p class="small fw-bold text-center">總體支出類別分佈</p>
-            <div class="chart-container" style="height: 300px;"><canvas id="anaBar"></canvas></div>
+            <p class="small fw-bold text-center mb-3">個人支出比例分析 (TWD)</p>
+            <div id="pie-container"></div> 
+
+            <p class="small fw-bold text-center">每日分攤支出流水 (TWD)</p>
+            <div style="height: 500px;"><canvas id="anaBar"></canvas></div>
             
             <hr>
             <h6 class="fw-bold">💰 淨額清算結果 (TWD)</h6>
@@ -210,21 +212,13 @@
             const ps = Array.from(document.querySelectorAll('.p-b.active')).map(e => e.innerText);
             const ms = Array.from(document.querySelectorAll('.m-b.active')).map(e => e.innerText);
             if(ps.length === 0 || ms.length === 0) { alert("請選擇付款人與分攤人"); return; }
-            
             const getD = (sel, mems) => Array.from(document.querySelectorAll(sel)).map(i => {
                 let v = parseFloat(i.value) || parseFloat(i.placeholder) || (total/mems.length);
                 return `${i.dataset.mem}:${v.toFixed(2)}`;
             }).join('|');
-
             const pD = ps.length > 1 ? getD('.p-val', ps) : "";
             const mD = document.getElementById('e_split_type').value === '分攤金額' ? getD('.m-val', ms) : "";
-
-            const data = [
-                document.getElementById('e_trip').value, document.getElementById('e_date').value, document.getElementById('e_cat').value, document.getElementById('e_item').value, 
-                document.getElementById('e_amt').value, document.getElementById('e_cur').value, document.getElementById('e_twd_val').innerText, 
-                ps.join(','), ms.join(','), document.getElementById('e_split_type').value, 
-                document.getElementById('e_pay_method').value, document.getElementById('e_note').value, "", `[P:${pD}][M:${mD}]`
-            ];
+            const data = [ document.getElementById('e_trip').value, document.getElementById('e_date').value, document.getElementById('e_cat').value, document.getElementById('e_item').value, document.getElementById('e_amt').value, document.getElementById('e_cur').value, document.getElementById('e_twd_val').innerText, ps.join(','), ms.join(','), document.getElementById('e_split_type').value, document.getElementById('e_pay_method').value, document.getElementById('e_note').value, "", `[P:${pD}][M:${mD}]` ];
             await postData('Expenses', data, document.getElementById('e_rowIdx').value);
             document.getElementById('e_rowIdx').value = ""; document.getElementById('e_item').value = ""; document.getElementById('e_amt').value = "";
         }
@@ -237,23 +231,6 @@
             toggleLoader(false);
         }
 
-        function editTrip(idx) {
-            const r = db.Trips[idx];
-            document.getElementById('t_rowIdx').value = idx;
-            document.getElementById('t_name').value = r[0]; document.getElementById('t_start').value = r[1];
-            document.getElementById('t_end').value = r[2]; document.getElementById('t_members').value = r[3];
-            showSec('trip');
-        }
-
-        function editEx(idx) {
-            const r = db.Exchange[idx];
-            document.getElementById('ex_rowIdx').value = idx;
-            document.getElementById('ex_date').value = r[1]; document.getElementById('ex_loc').value = r[2];
-            document.getElementById('ex_cur').value = r[3]; document.getElementById('ex_rate').value = r[4];
-            document.getElementById('ex_amt').value = r[5]; document.getElementById('ex_src').value = r[7];
-            calcExTwd(); showSec('ex');
-        }
-
         function editExp(idx) {
             const r = db.Expenses[idx];
             document.getElementById('e_rowIdx').value = idx;
@@ -261,35 +238,29 @@
             document.getElementById('e_item').value = r[3]; document.getElementById('e_amt').value = r[4];
             document.getElementById('e_cur').value = r[5]; document.getElementById('e_split_type').value = r[9];
             document.getElementById('e_pay_method').value = r[10]; document.getElementById('e_note').value = r[11];
-            
             syncExpUI();
             setTimeout(() => {
                 const ps = r[7].split(','), ms = r[8].split(','), meta = r[13] || "";
                 document.querySelectorAll('.p-b').forEach(b => { if(ps.includes(b.innerText)) b.classList.add('active'); });
                 document.querySelectorAll('.m-b').forEach(b => { if(ms.includes(b.innerText)) b.classList.add('active'); });
                 updateSplitUI();
-                // 恢復手動輸入金額
                 if(meta.includes('[M:')){
                     const mMatch = meta.match(/\[M:(.*?)\]/);
                     if(mMatch) mMatch[1].split('|').forEach(s => {
-                        const [n, v] = s.split(':');
-                        const input = document.querySelector(`.m-val[data-mem="${n}"]`);
-                        if(input) input.value = v;
+                        const [n, v] = s.split(':'); const input = document.querySelector(`.m-val[data-mem="${n}"]`); if(input) input.value = v;
                     });
                 }
                 if(meta.includes('[P:')){
                     const pMatch = meta.match(/\[P:(.*?)\]/);
                     if(pMatch) pMatch[1].split('|').forEach(s => {
-                        const [n, v] = s.split(':');
-                        const input = document.querySelector(`.p-val[data-mem="${n}"]`);
-                        if(input) input.value = v;
+                        const [n, v] = s.split(':'); const input = document.querySelector(`.p-val[data-mem="${n}"]`); if(input) input.value = v;
                     });
                 }
             }, 150);
             showSec('exp');
         }
 
-        // --- 核心分析與清算邏輯 (需求 3, 4, 6) ---
+        // --- 核心分析頁面 (修正橫條圖與清算) ---
         function renderCharts() {
             const tName = document.getElementById('ana_trip').value;
             const exps = db.Expenses.slice(1).filter(r => r[0] == tName);
@@ -297,70 +268,80 @@
             if(!trip) return;
             const mems = trip[3].split(',').map(m => m.trim());
 
-            // 1. 準備個人數據
-            const memData = {}; 
-            mems.forEach(m => memData[m] = { total: 0, cats: {} });
-
+            // 1. 個人圓餅圖
+            const memData = {}; mems.forEach(m => memData[m] = { total: 0, cats: {} });
             exps.forEach(r => {
-                const twdTotal = parseFloat(r[6]) || 0;
-                const rate = twdTotal / (parseFloat(r[4]) || 1); 
+                const twd = parseFloat(r[6]) || 0;
+                const rate = twd / (parseFloat(r[4]) || 1);
                 const ms = r[8].split(',');
-                
                 mems.forEach(m => {
                     if(!ms.includes(m)) return;
-                    let amt = 0;
+                    let share = 0;
                     if(r[9] === '分攤金額' && r[13].includes('[M:')) {
-                        const match = r[13].match(/\[M:(.*?)\]/);
-                        if(match) match[1].split('|').forEach(s => { 
-                            const [n, v] = s.split(':'); 
-                            if(n === m) amt = parseFloat(v) * rate; 
-                        });
-                    } else { amt = twdTotal / ms.length; }
-                    
-                    memData[m].total += amt;
-                    memData[m].cats[r[2]] = (memData[m].cats[r[2]] || 0) + amt;
+                        const mMatch = r[13].match(/\[M:(.*?)\]/);
+                        if(mMatch) mMatch[1].split('|').forEach(s => { const [n,v]=s.split(':'); if(n===m) share = parseFloat(v)*rate; });
+                    } else { share = twd / ms.length; }
+                    memData[m].total += share;
+                    memData[m].cats[r[2]] = (memData[m].cats[r[2]] || 0) + share;
                 });
             });
 
-            // 2. 渲染個人圓餅圖 (需求 3)
-            const container = document.getElementById('pie-container');
-            container.innerHTML = "";
+            const pCon = document.getElementById('pie-container'); pCon.innerHTML = "";
             mems.forEach((m, idx) => {
-                const div = document.createElement('div');
-                div.className = "chart-container";
+                const div = document.createElement('div'); div.className = "chart-container";
                 div.innerHTML = `<canvas id="pie-${idx}"></canvas><div class="pie-center"><small>${m}</small><br><b>${Math.round(memData[m].total).toLocaleString()}</b><br><small>TWD</small></div>`;
-                container.appendChild(div);
+                pCon.appendChild(div);
                 drawPie(`pie-${idx}`, Object.keys(memData[m].cats), Object.values(memData[m].cats));
             });
 
-            // 3. 渲染類別橫條圖
-            const allCats = {};
-            exps.forEach(r => { const v = parseFloat(r[6]) || 0; allCats[r[2]] = (allCats[r[2]] || 0) + v; });
+            // 2. 群組堆疊橫條圖 (需求 3: 縱軸日期成員，堆疊類別)
+            const dates = [...new Set(exps.map(r => r[1]))].sort();
+            const labels = [];
+            const cats = [...new Set(db.Expenses.slice(1).map(r => r[2]))];
+            const datasetMap = {}; cats.forEach(c => datasetMap[c] = []);
+
+            dates.forEach(d => {
+                mems.forEach(m => {
+                    labels.push(`${d.split('-').slice(1).join('/')} (${m})`);
+                    cats.forEach(c => {
+                        let val = 0;
+                        exps.filter(r => r[1] === d && r[2] === c).forEach(r => {
+                            const twd = parseFloat(r[6]) || 0;
+                            const rate = twd / (parseFloat(r[4]) || 1);
+                            const ms = r[8].split(',');
+                            if(ms.includes(m)) {
+                                if(r[9] === '分攤金額' && r[13].includes('[M:')) {
+                                    const mMatch = r[13].match(/\[M:(.*?)\]/);
+                                    if(mMatch) mMatch[1].split('|').forEach(s => { const [n,v]=s.split(':'); if(n===m) val += parseFloat(v)*rate; });
+                                } else { val += twd / ms.length; }
+                            }
+                        });
+                        datasetMap[c].push(val);
+                    });
+                });
+            });
+
             if(charts.anaBar) charts.anaBar.destroy();
             charts.anaBar = new Chart(document.getElementById('anaBar'), {
                 type: 'bar',
-                data: { labels: Object.keys(allCats), datasets: [{ label: '總支出 (TWD)', data: Object.values(allCats), backgroundColor: Object.keys(allCats).map(c => getCol(c)) }] },
-                options: { indexAxis: 'y', plugins: { legend: { display: false } } }
+                data: { labels, datasets: cats.map(c => ({ label: c, data: datasetMap[c], backgroundColor: getCol(c), stack: 'S1' })) },
+                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true } } }
             });
 
-            // 4. 清算邏輯 (需求 6: 淨額計算)
+            // 3. 淨額清算 (需求 4 & 6)
             let bal = {}; mems.forEach(m => bal[m] = 0);
             exps.forEach(r => {
                 const twd = parseFloat(r[6]) || 0;
                 const rate = twd / (parseFloat(r[4]) || 1);
-                // 付錢的人 (+)
+                // 付款 (+)
                 if(r[13].includes('[P:')) {
-                    r[13].match(/\[P:(.*?)\]/)[1].split('|').forEach(s => { 
-                        const [n, v] = s.split(':'); if(bal[n] !== undefined) bal[n] += parseFloat(v) * rate; 
-                    });
-                } else { if(bal[r[7]] !== undefined) bal[r[7]] += twd; }
-                // 應攤的人 (-)
+                    r[13].match(/\[P:(.*?)\]/)[1].split('|').forEach(s => { const [n,v]=s.split(':'); if(bal[n]!==undefined) bal[n]+=parseFloat(v)*rate; });
+                } else { if(bal[r[7]]!==undefined) bal[r[7]] += twd; }
+                // 分攤 (-)
                 const ms = r[8].split(',');
                 if(r[9] === '分攤金額' && r[13].includes('[M:')) {
-                    r[13].match(/\[M:(.*?)\]/)[1].split('|').forEach(s => { 
-                        const [n, v] = s.split(':'); if(bal[n] !== undefined) bal[n] -= parseFloat(v) * rate; 
-                    });
-                } else { ms.forEach(m => { if(bal[m] !== undefined) bal[m] -= twd / ms.length; }); }
+                    r[13].match(/\[M:(.*?)\]/)[1].split('|').forEach(s => { const [n,v]=s.split(':'); if(bal[n]!==undefined) bal[n]-=parseFloat(v)*rate; });
+                } else { ms.forEach(m => { if(bal[m]!==undefined) bal[m] -= twd / ms.length; }); }
             });
 
             let debtors = [], creditors = [];
@@ -372,17 +353,14 @@
             let sHtml = "";
             while(debtors.length > 0 && creditors.length > 0) {
                 let d = debtors[0], c = creditors[0], amt = Math.min(d.amt, c.amt);
-                sHtml += `<div class="d-flex justify-content-between border-bottom py-2">
-                            <span>💸 <b>${d.n}</b> 應支付給 <b>${c.n}</b></span>
-                            <span class="text-danger fw-bold">${Math.round(amt).toLocaleString()} TWD</span>
-                         </div>`;
+                sHtml += `<div class="d-flex justify-content-between border-bottom py-2"><span>💸 <b>${d.n}</b> 應支付給 <b>${c.n}</b></span><span class="text-danger fw-bold">${Math.round(amt).toLocaleString()} TWD</span></div>`;
                 d.amt -= amt; c.amt -= amt;
                 if(d.amt <= 1.5) debtors.shift(); if(c.amt <= 1.5) creditors.shift();
             }
-            document.getElementById('settle-list').innerHTML = sHtml || "🎉 帳目已兩清！";
+            document.getElementById('settle-list').innerHTML = sHtml || "🎉 帳目已結清！";
         }
 
-        // --- 記帳列表強化 (需求 2) ---
+        // --- 記帳清單強化 (需求 1 & 2) ---
         function updateExpList() {
             const tName = document.getElementById('e_trip').value;
             const trip = db.Trips.find(r => r[0] == tName);
@@ -390,113 +368,67 @@
             const mems = trip[3].split(',').map(m => m.trim());
             const data = db.Expenses.slice(1).map((r, i) => ({r, i: i+1})).filter(o => o.r[0] == tName);
 
-            let tableHeader = `<thead><tr><th>日期</th><th>項目</th><th>總計(TWD)</th>`;
-            mems.forEach(m => tableHeader += `<th>${m}分攤</th>`);
-            tableHeader += `<th>債務關係</th><th>✏️</th></tr></thead>`;
+            let h = `<thead><tr><th>日期</th><th>項目</th><th>總額</th>`;
+            mems.forEach(m => h += `<th>${m}攤</th>`);
+            h += `<th>債務關係</th><th>操作</th></tr></thead>`;
 
-            let tableBody = data.map(o => {
+            let b = data.map(o => {
                 const r = o.r;
-                const twdTotal = parseFloat(r[6]) || 0;
-                const rate = twdTotal / (parseFloat(r[4]) || 1);
-                const payers = r[7].split(',');
-                const splitters = r[8].split(',');
+                const twd = parseFloat(r[6]) || 0;
+                const rate = twd / (parseFloat(r[4]) || 1);
+                const payers = r[7].split(','), splitters = r[8].split(',');
                 
-                let row = `<tr><td>${r[1].split('-').slice(1).join('/')}</td><td>${r[3]}</td><td>${Math.round(twdTotal)}</td>`;
+                let row = `<tr><td>${r[1].split('-').slice(1).join('/')}</td><td>${r[3]}</td><td>${Math.round(twd)}</td>`;
                 
-                // 計算每人分攤
-                let splitMap = {};
+                let oweDetails = [];
                 mems.forEach(m => {
                     let share = 0;
                     if(splitters.includes(m)) {
                         if(r[9] === '分攤金額' && r[13].includes('[M:')) {
-                            const match = r[13].match(/\[M:(.*?)\]/);
-                            if(match) match[1].split('|').forEach(s => { 
-                                const [n, v] = s.split(':'); if(n === m) share = parseFloat(v) * rate; 
-                            });
-                        } else { share = twdTotal / splitters.length; }
+                            const mMatch = r[13].match(/\[M:(.*?)\]/);
+                            if(mMatch) mMatch[1].split('|').forEach(s => { const [n,v]=s.split(':'); if(n===m) share = parseFloat(v)*rate; });
+                        } else { share = twd / splitters.length; }
                     }
-                    splitMap[m] = share;
                     row += `<td>${Math.round(share)}</td>`;
+                    // 債務邏輯 (需求 1)
+                    if(share > 0 && !payers.includes(m) && payers.length === 1) {
+                        oweDetails.push(`${m} 欠 ${payers[0]} ${Math.round(share)}`);
+                    }
                 });
 
-                // 計算欠款關係 (簡化顯示)
-                let oweText = "-";
-                if(payers.length === 1 && splitters.length > 0) {
-                    const other = splitters.filter(m => m !== payers[0]);
-                    if(other.length > 0) {
-                        oweText = `${other.join('&')} 欠 ${payers[0]}`;
-                    }
-                }
-                row += `<td><small>${oweText}</small></td><td><span class="edit-btn" onclick="editExp(${o.i})">✏️</span></td></tr>`;
+                row += `<td><small>${oweDetails.join('<br>') || '-'}</small></td>
+                        <td><span class="edit-btn" onclick="editExp(${o.i})">✏️</span><span class="del-btn" onclick="deleteData('Expenses', ${o.i})">🗑️</span></td></tr>`;
                 return row;
             }).join('');
-
-            document.getElementById('exp-list-area').innerHTML = `<table class="table table-sm mt-2">${tableHeader}<tbody>${tableBody}</tbody></table>`;
+            document.getElementById('exp-list-area').innerHTML = `<table class="table table-sm mt-2">${h}<tbody>${b}</tbody></table>`;
         }
 
-        // --- 通用工具 ---
-        function updateTripList() {
-            document.getElementById('trip-list-area').innerHTML = db.Trips.slice(1).map((r, i) => `
-                <div class="card p-2 mb-2 d-flex justify-content-between flex-row align-items-center">
-                    <div><b>${r[0]}</b><br><small>${r[1]}~${r[2]}</small></div>
-                    <div><span class="edit-btn" onclick="editTrip(${i+1})">✏️</span><span class="del-btn" onclick="deleteData('Trips', ${i+1})">🗑️</span></div>
-                </div>`).join('');
-        }
-
+        // --- 其餘輔助工具 (不變) ---
+        function updateTripList() { document.getElementById('trip-list-area').innerHTML = db.Trips.slice(1).map((r, i) => `<div class="card p-2 mb-2 d-flex justify-content-between flex-row align-items-center"><div><b>${r[0]}</b><br><small>${r[1]}~${r[2]}</small></div><div><span class="edit-btn" onclick="editTrip(${i+1})">✏️</span><span class="del-btn" onclick="deleteData('Trips', ${i+1})">🗑️</span></div></div>`).join(''); }
         function updateExList() {
             const trip = document.getElementById('ex_trip').value;
             const data = db.Exchange.slice(1).map((r, i) => ({r, i: i+1})).filter(o => o.r[0] == trip);
-            document.getElementById('ex-list-area').innerHTML = `
-                <table class="table table-sm mt-2">
-                    <thead><tr><th>日期</th><th>幣別/額</th><th>台幣</th><th>匯率</th><th>備註</th><th></th></tr></thead>
-                    <tbody>${data.map(o => `<tr><td>${o.r[1]}</td><td>${o.r[3]}${o.r[5]}</td><td>${o.r[6]}</td><td>${o.r[4]}</td><td>${o.r[7]}</td><td><span class="edit-btn" onclick="editEx(${o.i})">✏️</span><span class="del-btn" onclick="deleteData('Exchange', ${o.i})">🗑️</span></td></tr>`).join('')}</tbody>
-                </table>`;
+            document.getElementById('ex-list-area').innerHTML = `<table class="table table-sm mt-2"><thead><tr><th>日期</th><th>幣/額</th><th>台幣</th><th>匯率</th><th>備註</th><th></th></tr></thead><tbody>${data.map(o => `<tr><td>${o.r[1]}</td><td>${o.r[3]}${o.r[5]}</td><td>${o.r[6]}</td><td>${o.r[4]}</td><td>${o.r[7]}</td><td><span class="edit-btn" onclick="editEx(${o.i})">✏️</span><span class="del-btn" onclick="deleteData('Exchange', ${o.i})">🗑️</span></td></tr>`).join('')}</tbody></table>`;
         }
-
         function syncExpUI() {
-            const tName = document.getElementById('e_trip').value;
-            const trip = db.Trips.find(r => r[0] == tName);
-            if(!trip) return;
+            const tName = document.getElementById('e_trip').value; const trip = db.Trips.find(r => r[0] == tName); if(!trip) return;
             const mems = trip[3].split(',').map(m => m.trim());
             const badge = (cls) => mems.map(m => `<span class="badge-mem ${cls}" onclick="this.classList.toggle('active'); updateSplitUI();">${m}</span>`).join('');
-            document.getElementById('p-box').innerHTML = badge('p-b');
-            document.getElementById('m-box').innerHTML = badge('m-b');
-            let curs = ["TWD"]; 
-            db.Exchange.slice(1).forEach(r => { if(r[0] == tName) curs.push(r[3]); });
+            document.getElementById('p-box').innerHTML = badge('p-b'); document.getElementById('m-box').innerHTML = badge('m-b');
+            let curs = ["TWD"]; db.Exchange.slice(1).forEach(r => { if(r[0] == tName) curs.push(r[3]); });
             document.getElementById('e_cur').innerHTML = [...new Set(curs)].map(c => `<option value="${c}">${c}</option>`).join('');
             updateExpList();
         }
-
-        async function postData(sheet, data, rowIdx) {
-            toggleLoader(true);
-            const method = rowIdx ? "update" : "append";
-            await fetch(API_URL, { method: 'POST', body: JSON.stringify({sheet, method, data, rowIdx}) });
-            await fetchData();
-            toggleLoader(false);
-        }
-
+        async function postData(sheet, data, rowIdx) { toggleLoader(true); const method = rowIdx ? "update" : "append"; await fetch(API_URL, { method: 'POST', body: JSON.stringify({sheet, method, data, rowIdx}) }); await fetchData(); toggleLoader(false); }
         function toggleLoader(s) { document.getElementById('loader').style.display = s ? 'flex' : 'none'; }
         function calcExTwd() { document.getElementById('ex_twd_display').innerText = Math.round(parseFloat(document.getElementById('ex_rate').value || 0) * parseFloat(document.getElementById('ex_amt').value || 0)); }
         function calcTwd() {
             const cur = document.getElementById('e_cur').value, amt = parseFloat(document.getElementById('e_amt').value) || 0;
             if(cur === "TWD") document.getElementById('e_twd_val').innerText = amt;
-            else {
-                const ex = db.Exchange.slice(1).reverse().find(r => r[0] == document.getElementById('e_trip').value && r[3] == cur);
-                document.getElementById('e_twd_val').innerText = ex ? Math.round(amt * ex[4]) : "匯率未知";
-            }
+            else { const ex = db.Exchange.slice(1).reverse().find(r => r[0] == document.getElementById('e_trip').value && r[3] == cur); document.getElementById('e_twd_val').innerText = ex ? Math.round(amt * ex[4]) : "匯率未知"; }
         }
-        function drawPie(id, labels, data) {
-            if(charts[id]) charts[id].destroy();
-            charts[id] = new Chart(document.getElementById(id), { 
-                type: 'doughnut', 
-                data: { labels, datasets: [{ data, backgroundColor: labels.map(l => getCol(l)) }] }, 
-                options: { cutout: '70%', plugins: { legend: { display: false } } } 
-            });
-        }
-        function getCol(c) {
-            const colors = { '機票': '#4f6d5a', '交通': '#8c7b6c', '住宿': '#d9c5b2', '飲食(餐)': '#b66a50', '玩樂': '#2d4a3e', '紀念品(食品)': '#e9c46a' };
-            return colors[c] || '#' + Math.floor(Math.random()*16777215).toString(16);
-        }
+        function drawPie(id, labels, data) { if(charts[id]) charts[id].destroy(); charts[id] = new Chart(document.getElementById(id), { type: 'doughnut', data: { labels, datasets: [{ data, backgroundColor: labels.map(l => getCol(l)) }] }, options: { cutout: '70%', plugins: { legend: { display: false } } } }); }
+        function getCol(c) { const colors = { '機票': '#4f6d5a', '交通': '#8c7b6c', '住宿': '#d9c5b2', '飲食(餐)': '#b66a50', '玩樂': '#2d4a3e', '紀念品(食品)': '#e9c46a' }; return colors[c] || '#' + Math.floor(Math.random()*16777215).toString(16); }
     </script>
 </body>
 </html>
