@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>大地分帳 V12 修正版</title>
+    <title>大地分帳 V12.1 進階版</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
@@ -19,17 +19,19 @@
         .section.active { display: block; }
         .badge-mem { background: #eee; padding: 5px 12px; border-radius: 20px; margin: 3px; display: inline-block; cursor: pointer; font-size: 0.85rem; border: 1px solid #ddd; }
         .badge-mem.active { background: var(--earth); color: white; border-color: var(--earth); }
-        .edit-btn { cursor: pointer; color: var(--earth); font-weight: bold; margin-left: 10px; }
+        .edit-btn { cursor: pointer; color: var(--earth); font-weight: bold; margin-left: 5px; }
         .del-btn { cursor: pointer; color: #dc3545; font-weight: bold; margin-left: 10px; }
+        .table-area { background: white; border-radius: 10px; padding: 5px; overflow-x: auto; font-size: 0.7rem; }
         .loading { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(255,255,255,0.8); display:none; align-items:center; justify-content:center; z-index:9999; flex-direction: column; }
         .chart-container { position: relative; height: 300px; margin-bottom: 20px; }
         .pie-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -20%); text-align: center; pointer-events: none; }
+        .table thead th { background: #f8f9fa; color: #666; font-weight: bold; }
     </style>
 </head>
 <body>
 
-    <div class="loading" id="loader"><div class="spinner-border text-success mb-2"></div>同步中...</div>
-    <div class="app-header" onclick="fetchData()">🌏 大地分帳 V12 (點此重新整理)</div>
+    <div class="loading" id="loader"><div class="spinner-border text-success mb-2"></div>數據同步中...</div>
+    <div class="app-header" onclick="fetchData()">🌏 大地分帳 V12.1</div>
 
     <div id="sec-trip" class="section">
         <div class="card">
@@ -48,16 +50,16 @@
             <h6 class="fw-bold">💱 換匯紀錄</h6>
             <input type="hidden" id="ex_rowIdx">
             <select id="ex_trip" class="form-select mb-2" onchange="syncTrip(this.value); updateExList();"></select>
-            <div class="row g-2 mb-2"><div class="col-6"><input type="date" id="ex_date" class="form-control"></div><div class="col-6"><input type="text" id="ex_loc" class="form-control" placeholder="換匯所"></div></div>
+            <div class="row g-2 mb-2"><div class="col-6"><input type="date" id="ex_date" class="form-control"></div><div class="col-6"><input type="text" id="ex_loc" class="form-control" placeholder="換匯所/來源"></div></div>
             <div class="row g-2 mb-2">
                 <div class="col-4"><input type="text" id="ex_cur" class="form-control" placeholder="幣別"></div>
                 <div class="col-8"><input type="number" id="ex_rate" class="form-control" placeholder="匯率 (1外幣=?台幣)" oninput="calcExTwd()"></div>
             </div>
             <div class="row g-2 mb-2">
-                <div class="col-6"><input type="number" id="ex_amt" class="form-control" placeholder="金額" oninput="calcExTwd()"></div>
-                <div class="col-6"><input type="text" id="ex_src" class="form-control" placeholder="來源 (如現金)"></div>
+                <div class="col-6"><input type="number" id="ex_amt" class="form-control" placeholder="外幣金額" oninput="calcExTwd()"></div>
+                <div class="col-6"><input type="text" id="ex_src" class="form-control" placeholder="備註"></div>
             </div>
-            <div class="small mb-3">台幣金額: <span id="ex_twd_display" class="fw-bold text-danger">0</span></div>
+            <div class="small mb-3">台幣預估: <span id="ex_twd_display" class="fw-bold text-danger">0</span> TWD</div>
             <button class="btn btn-earth" onclick="saveEx()">儲存換匯</button>
         </div>
         <div id="ex-list-area" class="table-area"></div>
@@ -70,19 +72,19 @@
             <select id="e_trip" class="form-select mb-2" onchange="syncTrip(this.value); syncExpUI();"></select>
             <div class="row g-2 mb-2">
                 <div class="col-6"><input type="date" id="e_date" class="form-control"></div>
-                <div class="col-6"><select id="e_cat" class="form-select"><option>機票</option><option>交通</option><option>住宿</option><option>飲食(餐)</option><option>零食點心飲料</option><option>玩樂</option><option>紀念品(禮用品)</option><option>團費</option><option>其他</option></select></div>
+                <div class="col-6"><select id="e_cat" class="form-select"><option>機票</option><option>交通</option><option>住宿</option><option>飲食(餐)</option><option>零食點心飲料</option><option>玩樂</option><option>紀念品</option><option>團費</option><option>其他</option></select></div>
             </div>
             <input type="text" id="e_item" class="form-control mb-2" placeholder="品項名稱">
             <div class="row g-2 mb-1">
                 <div class="col-7"><input type="number" id="e_amt" class="form-control" placeholder="金額" oninput="calcTwd(); updateSplitUI();"></div>
-                <div class="col-5"><select id="e_cur" class="form-select" onchange="calcTwd()"></select></div>
+                <div class="col-5"><select id="e_cur" class="form-select" onchange="calcTwd(); updateSplitUI();"></select></div>
             </div>
-            <div class="small mb-2 text-muted">台幣預估: <span id="e_twd_val" class="fw-bold text-danger">0</span></div>
+            <div class="small mb-2 text-muted">台幣預估: <span id="e_twd_val" class="fw-bold text-danger">0</span> TWD</div>
             
             <label class="small fw-bold">誰付錢？</label><div id="p-box" class="mb-2"></div>
             <div id="p-details" style="display:none;" class="bg-light p-2 mb-2 rounded"></div>
 
-            <label class="small fw-bold">誰分攤？</label><div id="m-box" class="mb-2"></div>
+            <label class="small fw-bold">誰分攤？(單位隨上方幣別)</label><div id="m-box" class="mb-2"></div>
             <select id="e_split_type" class="form-select form-select-sm mb-2" onchange="updateSplitUI()">
                 <option value="平分">平分</option><option value="分攤金額">分攤金額</option>
             </select>
@@ -101,18 +103,18 @@
         <div class="card">
             <select id="ana_trip" class="form-select mb-3" onchange="syncTrip(this.value); renderCharts();"></select>
             
-            <p class="small fw-bold text-center">總支出比例</p>
+            <p class="small fw-bold text-center">總支出比例 (TWD)</p>
             <div class="chart-container">
                 <canvas id="anaPie"></canvas>
-                <div class="pie-center"><small>總花費</small><br><b id="total-spend-text">0</b></div>
+                <div class="pie-center"><small>總計</small><br><b id="total-spend-text">0</b><br><small>TWD</small></div>
             </div>
 
-            <p class="small fw-bold text-center">每日每人支出分析 (類別堆疊)</p>
+            <p class="small fw-bold text-center">每日每人分攤支出 (TWD)</p>
             <div style="height: 400px;"><canvas id="anaBar"></canvas></div>
             
             <hr>
-            <h6 class="fw-bold">💰 台幣清算結果</h6>
-            <div id="settle-list" class="small p-3 bg-light rounded"></div>
+            <h6 class="fw-bold">💰 清算清單 (TWD)</h6>
+            <div id="settle-list" class="small p-3 bg-light rounded shadow-sm"></div>
         </div>
     </div>
 
@@ -124,7 +126,8 @@
     </nav>
 
     <script>
-        const API_URL = "https://script.google.com/macros/s/AKfycbzBBA5gKhn-Ld52mW0bDH9rxKLSy0qYPfaC3zF4eVnuadZ1aG-5EOQ06MeaTmhoefY/exec"; 
+        // --- 核心設定 ---
+        const API_URL = "https://script.google.com/macros/s/AKfycbzbicmRk00xed3yYDhAnGLXkztKHOQrwPNttZEBTQapLLgrsbz2aD3xEdNJHQil5h2P/exec"; 
         let db = { Trips: [], Exchange: [], Expenses: [] };
         let charts = {};
 
@@ -139,17 +142,15 @@
                 const res = await fetch(API_URL);
                 db = await res.json();
                 renderUI();
-            } catch (e) { alert("讀取失敗"); }
+            } catch (e) { alert("讀取失敗，請確認網路與 GAS 部署。"); }
             toggleLoader(false);
         }
 
         function renderUI() {
             const tripOptions = db.Trips.slice(1).map(r => `<option value="${r[0]}">${r[0]}</option>`).join('');
             ['ex_trip', 'e_trip', 'ana_trip'].forEach(id => document.getElementById(id).innerHTML = tripOptions);
-            
             const lastTrip = localStorage.getItem('selectedTrip');
             if(lastTrip) syncTrip(lastTrip);
-
             updateTripList();
             updateExList();
             syncExpUI();
@@ -170,37 +171,190 @@
             if(id === 'ana') renderCharts();
         }
 
-        // --- 核心邏輯：自動餘額計算 ---
+        // --- 換匯邏輯 ---
+        function updateExList() {
+            const trip = document.getElementById('ex_trip').value;
+            const data = db.Exchange.slice(1).map((r, i) => ({r, i: i+1})).filter(o => o.r[0] == trip);
+            document.getElementById('ex-list-area').innerHTML = `
+                <table class="table table-sm mt-2">
+                    <thead><tr><th>日期</th><th>外幣金額</th><th>台幣金額</th><th>匯率</th><th>備註</th><th></th></tr></thead>
+                    <tbody>${data.map(o => `
+                        <tr>
+                            <td>${o.r[1]}</td>
+                            <td>${o.r[3]}${o.r[5]}</td>
+                            <td>${o.r[6]}</td>
+                            <td>${o.r[4]}</td>
+                            <td>${o.r[7]}</td>
+                            <td>
+                                <span class="edit-btn" onclick="editEx(${o.i})">✏️</span>
+                                <span class="del-btn" onclick="deleteData('Exchange', ${o.i})">🗑️</span>
+                            </td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>`;
+        }
+
+        function calcExTwd() { 
+            const twd = Math.round(parseFloat(document.getElementById('ex_rate').value || 0) * parseFloat(document.getElementById('ex_amt').value || 0));
+            document.getElementById('ex_twd_display').innerText = twd; 
+        }
+
+        // --- 記帳邏輯 ---
+        function updateExpList() {
+            const trip = document.getElementById('e_trip').value;
+            const data = db.Expenses.slice(1).map((r, i) => ({r, i: i+1})).filter(o => o.r[0] == trip);
+            document.getElementById('exp-list-area').innerHTML = `
+                <table class="table table-sm mt-2">
+                    <thead><tr><th>日期</th><th>項目</th><th>台幣金額</th><th>參與者</th><th></th></tr></thead>
+                    <tbody>${data.map(o => `
+                        <tr>
+                            <td>${o.r[1]}</td>
+                            <td>${o.r[3]}</td>
+                            <td>$${o.r[6]}</td>
+                            <td>${o.r[8]}</td>
+                            <td>
+                                <span class="edit-btn" onclick="editExp(${o.i})">✏️</span>
+                                <span class="del-btn" onclick="deleteData('Expenses', ${o.i})">🗑️</span>
+                            </td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>`;
+        }
+
         function handleAutoFill(containerId, total, inputCls) {
             const inputs = Array.from(document.querySelectorAll(`#${containerId} .${inputCls}`));
             const filled = inputs.filter(i => i.value !== "");
             const empty = inputs.filter(i => i.value === "");
             if (empty.length === 1) {
                 const sum = filled.reduce((s, i) => s + parseFloat(i.value || 0), 0);
-                empty[0].placeholder = Math.max(0, total - sum).toFixed(0);
+                empty[0].placeholder = Math.max(0, total - sum).toFixed(2);
             }
         }
 
         function updateSplitUI() {
             const ps = Array.from(document.querySelectorAll('.p-b.active')).map(e => e.innerText);
             const ms = Array.from(document.querySelectorAll('.m-b.active')).map(e => e.innerText);
-            const total = parseFloat(document.getElementById('e_amt').value) || 0;
+            const amt = parseFloat(document.getElementById('e_amt').value) || 0;
             const type = document.getElementById('e_split_type').value;
 
             const pBox = document.getElementById('p-details');
             if(ps.length > 1) {
-                pBox.innerHTML = ps.map(n => `<div class="input-group input-group-sm mb-1"><span class="input-group-text">${n}</span><input type="number" class="form-control p-val" data-mem="${n}" oninput="handleAutoFill('p-details', ${total}, 'p-val')"></div>`).join('');
+                pBox.innerHTML = ps.map(n => `<div class="input-group input-group-sm mb-1"><span class="input-group-text">${n}</span><input type="number" class="form-control p-val" data-mem="${n}" oninput="handleAutoFill('p-details', ${amt}, 'p-val')"></div>`).join('');
                 pBox.style.display = 'block';
             } else { pBox.style.display = 'none'; }
 
             const mBox = document.getElementById('m-details');
             if(type === '分攤金額' && ms.length > 0) {
-                mBox.innerHTML = ms.map(n => `<div class="input-group input-group-sm mb-1"><span class="input-group-text">${n}</span><input type="number" class="form-control m-val" data-mem="${n}" oninput="handleAutoFill('m-details', ${total}, 'm-val')"></div>`).join('');
+                mBox.innerHTML = ms.map(n => `<div class="input-group input-group-sm mb-1"><span class="input-group-text">${n}</span><input type="number" class="form-control m-val" data-mem="${n}" oninput="handleAutoFill('m-details', ${amt}, 'm-val')"></div>`).join('');
                 mBox.style.display = 'block';
             } else { mBox.style.display = 'none'; }
         }
 
-        // --- 儲存與編輯/刪除 ---
+        function calcTwd() {
+            const cur = document.getElementById('e_cur').value, amt = parseFloat(document.getElementById('e_amt').value) || 0;
+            if(cur === "TWD") document.getElementById('e_twd_val').innerText = amt;
+            else {
+                const ex = db.Exchange.slice(1).reverse().find(r => r[0] == document.getElementById('e_trip').value && r[3] == cur);
+                document.getElementById('e_twd_val').innerText = ex ? Math.round(amt * ex[4]) : "匯率未知";
+            }
+        }
+
+        // --- 分析與清算 (關鍵計算位置) ---
+        function renderCharts() {
+            const tripName = document.getElementById('ana_trip').value;
+            const exps = db.Expenses.slice(1).filter(r => r[0] == tripName);
+            const trip = db.Trips.find(r => r[0] == tripName);
+            if(!trip) return;
+            const mems = trip[3].split(',').map(m => m.trim());
+
+            // 1. 總支出比例
+            const cats = {}; let totalAll = 0;
+            exps.forEach(r => { const v = parseFloat(r[6]) || 0; cats[r[2]] = (cats[r[2]] || 0) + v; totalAll += v; });
+            document.getElementById('total-spend-text').innerText = Math.round(totalAll).toLocaleString();
+            drawPie('anaPie', Object.keys(cats), Object.values(cats));
+
+            // 2. 每日每人分攤數據 (將外幣分攤轉為台幣)
+            const dates = [...new Set(exps.map(r => r[1]))].sort();
+            const labels = []; 
+            const datasetMap = {}; 
+
+            dates.forEach(d => {
+                mems.forEach(m => {
+                    labels.push(`${d} (${m})`);
+                    exps.filter(r => r[1] === d).forEach(r => {
+                        const ms = r[8].split(',');
+                        if(!ms.includes(m)) return;
+                        
+                        let twdAmt = 0;
+                        const rate = parseFloat(r[6]) / parseFloat(r[4]); // 換算出該筆記帳的台幣匯率
+
+                        if(r[9] === '分攤金額' && r[13].includes('[M:')) {
+                            const match = r[13].match(/\[M:(.*?)\]/);
+                            if(match) match[1].split('|').forEach(s => { 
+                                const [n,v]=s.split(':'); 
+                                if(n===m) twdAmt = parseFloat(v) * rate; // 分攤外幣 * 匯率 = 台幣
+                            });
+                        } else { 
+                            twdAmt = (parseFloat(r[6]) || 0) / ms.length; 
+                        }
+
+                        if(!datasetMap[r[2]]) datasetMap[r[2]] = Array(dates.length * mems.length).fill(0);
+                        datasetMap[r[2]][labels.length - 1] += twdAmt;
+                    });
+                });
+            });
+
+            if(charts.anaBar) charts.anaBar.destroy();
+            charts.anaBar = new Chart(document.getElementById('anaBar'), {
+                type: 'bar',
+                data: { labels, datasets: Object.keys(datasetMap).map(c => ({ label: c, data: datasetMap[c], backgroundColor: getCol(c), stack: 'S' })) },
+                options: { 
+                    indexAxis: 'y', responsive: true, maintainAspectRatio: false, 
+                    plugins: { tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${Math.round(ctx.raw)} TWD` } } },
+                    scales: { x: { stacked: true, title: { display: true, text: 'TWD' } }, y: { stacked: true } } 
+                }
+            });
+
+            // 3. 清算計算 (統一使用台幣)
+            let bal = {}; mems.forEach(m => bal[m] = 0);
+            exps.forEach(r => {
+                const rate = parseFloat(r[6]) / parseFloat(r[4]);
+                // 付款者台幣增加
+                if(r[13].includes('[P:')) {
+                    r[13].match(/\[P:(.*?)\]/)[1].split('|').forEach(s => { 
+                        const [n,v]=s.split(':'); if(bal[n]!==undefined) bal[n]+= (parseFloat(v) * rate); 
+                    });
+                } else { if(bal[r[7]]!==undefined) bal[r[7]] += parseFloat(r[6]); }
+                
+                // 分攤者台幣減少
+                const ms = r[8].split(',');
+                if(r[9] === '分攤金額' && r[13].includes('[M:')) {
+                    r[13].match(/\[M:(.*?)\]/)[1].split('|').forEach(s => { 
+                        const [n,v]=s.split(':'); if(bal[n]!==undefined) bal[n]-= (parseFloat(v) * rate); 
+                    });
+                } else { ms.forEach(m => { if(bal[m]!==undefined) bal[m] -= (parseFloat(r[6])/ms.length); }); }
+            });
+
+            let debtors = [], creditors = [];
+            Object.entries(bal).forEach(([n, b]) => {
+                if (b < -1.5) debtors.push({n, amt: Math.abs(b)});
+                else if (b > 1.5) creditors.push({n, amt: b});
+            });
+
+            let sHtml = "";
+            while(debtors.length > 0 && creditors.length > 0) {
+                let d = debtors[0], c = creditors[0], amt = Math.min(d.amt, c.amt);
+                sHtml += `<div class="d-flex justify-content-between border-bottom py-2">
+                            <span>💸 <b>${d.n}</b> 應支付給 <b>${c.n}</b></span>
+                            <span class="text-danger fw-bold">${Math.round(amt).toLocaleString()} TWD</span>
+                         </div>`;
+                d.amt -= amt; c.amt -= amt;
+                if(d.amt <= 1.5) debtors.shift(); if(c.amt <= 1.5) creditors.shift();
+            }
+            document.getElementById('settle-list').innerHTML = sHtml || "✅ 帳目已結清，目前沒人欠錢！";
+        }
+
+        // --- 通用 CRUD 與 工具 ---
         async function saveTrip() {
             const data = [document.getElementById('t_name').value, document.getElementById('t_start').value, document.getElementById('t_end').value, document.getElementById('t_members').value, "TWD"];
             await postData('Trips', data, document.getElementById('t_rowIdx').value);
@@ -214,192 +368,18 @@
         }
 
         async function saveExp() {
-            const total = parseFloat(document.getElementById('e_amt').value) || 0;
+            const amt = parseFloat(document.getElementById('e_amt').value) || 0;
             const ps = Array.from(document.querySelectorAll('.p-b.active')).map(e => e.innerText);
             const ms = Array.from(document.querySelectorAll('.m-b.active')).map(e => e.innerText);
-            
             const getD = (sel, mems) => Array.from(document.querySelectorAll(sel)).map(i => {
-                let v = parseFloat(i.value) || parseFloat(i.placeholder) || (total/mems.length);
+                let v = parseFloat(i.value) || parseFloat(i.placeholder) || (amt/mems.length);
                 return `${i.dataset.mem}:${v.toFixed(2)}`;
             }).join('|');
-
             const pD = ps.length > 1 ? getD('.p-val', ps) : "";
             const mD = document.getElementById('e_split_type').value === '分攤金額' ? getD('.m-val', ms) : "";
-
-            const data = [
-                document.getElementById('e_trip').value, document.getElementById('e_date').value, document.getElementById('e_cat').value, document.getElementById('e_item').value, 
-                document.getElementById('e_amt').value, document.getElementById('e_cur').value, document.getElementById('e_twd_val').innerText, 
-                ps.join(','), ms.join(','), document.getElementById('e_split_type').value, 
-                document.getElementById('e_pay_method').value, document.getElementById('e_note').value, "", `[P:${pD}][M:${mD}]`
-            ];
+            const data = [document.getElementById('e_trip').value, document.getElementById('e_date').value, document.getElementById('e_cat').value, document.getElementById('e_item').value, document.getElementById('e_amt').value, document.getElementById('e_cur').value, document.getElementById('e_twd_val').innerText, ps.join(','), ms.join(','), document.getElementById('e_split_type').value, document.getElementById('e_pay_method').value, document.getElementById('e_note').value, "", `[P:${pD}][M:${mD}]` ];
             await postData('Expenses', data, document.getElementById('e_rowIdx').value);
-            document.getElementById('e_rowIdx').value = ""; document.getElementById('e_item').value = ""; document.getElementById('e_amt').value = "";
-        }
-
-        async function deleteData(sheet, idx) {
-            if(!confirm("確定刪除此筆資料？")) return;
-            toggleLoader(true);
-            await fetch(API_URL, { method: 'POST', body: JSON.stringify({sheet, method: "delete", rowIdx: idx}) });
-            await fetchData();
-            toggleLoader(false);
-        }
-
-        // --- 編輯功能輔助 ---
-        function editTrip(idx) {
-            const r = db.Trips[idx];
-            document.getElementById('t_rowIdx').value = idx;
-            document.getElementById('t_name').value = r[0];
-            document.getElementById('t_start').value = r[1];
-            document.getElementById('t_end').value = r[2];
-            document.getElementById('t_members').value = r[3];
-            showSec('trip'); window.scrollTo(0,0);
-        }
-
-        function editEx(idx) {
-            const r = db.Exchange[idx];
-            document.getElementById('ex_rowIdx').value = idx;
-            document.getElementById('ex_date').value = r[1];
-            document.getElementById('ex_loc').value = r[2];
-            document.getElementById('ex_cur').value = r[3];
-            document.getElementById('ex_rate').value = r[4];
-            document.getElementById('ex_amt').value = r[5];
-            document.getElementById('ex_src').value = r[7];
-            calcExTwd(); showSec('ex'); window.scrollTo(0,0);
-        }
-
-        function editExp(idx) {
-            const r = db.Expenses[idx];
-            document.getElementById('e_rowIdx').value = idx;
-            document.getElementById('e_date').value = r[1];
-            document.getElementById('e_cat').value = r[2];
-            document.getElementById('e_item').value = r[3];
-            document.getElementById('e_amt').value = r[4];
-            document.getElementById('e_cur').value = r[5];
-            document.getElementById('e_split_type').value = r[9];
-            document.getElementById('e_pay_method').value = r[10];
-            document.getElementById('e_note').value = r[11];
-            
-            syncExpUI();
-            setTimeout(() => {
-                const ps = r[7].split(','), ms = r[8].split(',');
-                document.querySelectorAll('.p-b').forEach(b => { if(ps.includes(b.innerText)) b.classList.add('active'); });
-                document.querySelectorAll('.m-b').forEach(b => { if(ms.includes(b.innerText)) b.classList.add('active'); });
-                updateSplitUI();
-            }, 100);
-            showSec('exp'); window.scrollTo(0,0);
-        }
-
-        // --- 分析與圖表 ---
-        function renderCharts() {
-            const tripName = document.getElementById('ana_trip').value;
-            const exps = db.Expenses.slice(1).filter(r => r[0] == tripName);
-            const trip = db.Trips.find(r => r[0] == tripName);
-            if(!trip) return;
-            const mems = trip[3].split(',').map(m => m.trim());
-
-            // 1. 總支出圓餅圖
-            const cats = {}; let totalAll = 0;
-            exps.forEach(r => { const v = parseFloat(r[6]) || 0; cats[r[2]] = (cats[r[2]] || 0) + v; totalAll += v; });
-            document.getElementById('total-spend-text').innerText = Math.round(totalAll);
-            drawPie('anaPie', Object.keys(cats), Object.values(cats));
-
-            // 2. 每日橫向堆疊圖 (縱軸:日期+人, 橫軸:費用類別堆疊)
-            const dates = [...new Set(exps.map(r => r[1]))].sort();
-            const labels = []; 
-            const datasetMap = {}; // key: category
-
-            dates.forEach(d => {
-                mems.forEach(m => {
-                    labels.push(`${d} (${m})`);
-                    // 為每個分類計算該日期該人的分攤額
-                    exps.filter(r => r[1] === d).forEach(r => {
-                        const ms = r[8].split(',');
-                        if(!ms.includes(m)) return;
-                        
-                        let amt = 0;
-                        if(r[9] === '分攤金額' && r[13].includes('[M:')) {
-                            const match = r[13].match(/\[M:(.*?)\]/);
-                            if(match) match[1].split('|').forEach(s => { const [n,v]=s.split(':'); if(n===m) amt = parseFloat(v); });
-                        } else { amt = (parseFloat(r[6]) || 0) / ms.length; }
-
-                        if(!datasetMap[r[2]]) datasetMap[r[2]] = Array(dates.length * mems.length).fill(0);
-                        datasetMap[r[2]][labels.length - 1] += amt;
-                    });
-                });
-            });
-
-            if(charts.anaBar) charts.anaBar.destroy();
-            charts.anaBar = new Chart(document.getElementById('anaBar'), {
-                type: 'bar',
-                data: { labels, datasets: Object.keys(datasetMap).map(c => ({ label: c, data: datasetMap[c], backgroundColor: getCol(c), stack: 'S' })) },
-                options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true } } }
-            });
-
-            // 3. 清算邏輯
-            let bal = {}; mems.forEach(m => bal[m] = 0);
-            exps.forEach(r => {
-                const twd = parseFloat(r[6]) || 0;
-                if(r[13].includes('[P:')) {
-                    r[13].match(/\[P:(.*?)\]/)[1].split('|').forEach(s => { const [n,v]=s.split(':'); if(bal[n]!==undefined) bal[n]+=parseFloat(v); });
-                } else { if(bal[r[7]]!==undefined) bal[r[7]] += twd; }
-                
-                const ms = r[8].split(',');
-                if(r[9] === '分攤金額' && r[13].includes('[M:')) {
-                    r[13].match(/\[M:(.*?)\]/)[1].split('|').forEach(s => { const [n,v]=s.split(':'); if(bal[n]!==undefined) bal[n]-=parseFloat(v); });
-                } else { ms.forEach(m => { if(bal[m]!==undefined) bal[m] -= twd/ms.length; }); }
-            });
-
-            let debtors = [], creditors = [];
-            Object.entries(bal).forEach(([n, b]) => {
-                if (b < -1) debtors.push({n, amt: Math.abs(b)});
-                else if (b > 1) creditors.push({n, amt: b});
-            });
-
-            let sHtml = "";
-            while(debtors.length > 0 && creditors.length > 0) {
-                let d = debtors[0], c = creditors[0], amt = Math.min(d.amt, c.amt);
-                sHtml += `<div class="d-flex justify-content-between border-bottom py-1"><span><b>${d.n}</b> ➜ ${c.n}</span><span class="text-danger fw-bold">$${Math.round(amt)}</span></div>`;
-                d.amt -= amt; c.amt -= amt;
-                if(d.amt <= 1) debtors.shift(); if(c.amt <= 1) creditors.shift();
-            }
-            document.getElementById('settle-list').innerHTML = sHtml || "🎉 帳目已兩清！";
-        }
-
-        // --- 介面更新工具 ---
-        function updateTripList() {
-            document.getElementById('trip-list-area').innerHTML = db.Trips.slice(1).map((r, i) => `
-                <div class="card p-2 mb-2 d-flex justify-content-between flex-row align-items-center">
-                    <div><b>${r[0]}</b><br><small>${r[1]}~${r[2]}</small></div>
-                    <div><span class="edit-btn" onclick="editTrip(${i+1})">✏️</span><span class="del-btn" onclick="deleteData('Trips', ${i+1})">🗑️</span></div>
-                </div>`).join('');
-        }
-
-        function updateExList() {
-            const trip = document.getElementById('ex_trip').value;
-            const data = db.Exchange.slice(1).map((r, i) => ({r, i: i+1})).filter(o => o.r[0] == trip);
-            document.getElementById('ex-list-area').innerHTML = `<table class="table table-sm"><tbody>` + 
-                data.map(o => `<tr><td>${o.r[1]}</td><td>${o.r[3]}</td><td>$${o.r[6]}</td><td><span class="edit-btn" onclick="editEx(${o.i})">✏️</span><span class="del-btn" onclick="deleteData('Exchange', ${o.i})">🗑️</span></td></tr>`).join('') + `</tbody></table>`;
-        }
-
-        function updateExpList() {
-            const trip = document.getElementById('e_trip').value;
-            const data = db.Expenses.slice(1).map((r, i) => ({r, i: i+1})).filter(o => o.r[0] == trip);
-            document.getElementById('exp-list-area').innerHTML = `<table class="table table-sm"><tbody>` + 
-                data.map(o => `<tr><td>${o.r[1]}</td><td>${o.r[3]}</td><td>$${o.r[6]}</td><td><span class="edit-btn" onclick="editExp(${o.i})">✏️</span><span class="del-btn" onclick="deleteData('Expenses', ${o.i})">🗑️</span></td></tr>`).join('') + `</tbody></table>`;
-        }
-
-        function syncExpUI() {
-            const tName = document.getElementById('e_trip').value;
-            const trip = db.Trips.find(r => r[0] == tName);
-            if(!trip) return;
-            const mems = trip[3].split(',').map(m => m.trim());
-            const badge = (cls) => mems.map(m => `<span class="badge-mem ${cls}" onclick="this.classList.toggle('active'); updateSplitUI();">${m}</span>`).join('');
-            document.getElementById('p-box').innerHTML = badge('p-b');
-            document.getElementById('m-box').innerHTML = badge('m-b');
-            let curs = ["TWD"]; 
-            db.Exchange.slice(1).forEach(r => { if(r[0] == tName) curs.push(r[3]); });
-            document.getElementById('e_cur').innerHTML = [...new Set(curs)].map(c => `<option value="${c}">${c}</option>`).join('');
-            updateExpList();
+            ['e_rowIdx', 'e_item', 'e_amt'].forEach(id => document.getElementById(id).value = "");
         }
 
         async function postData(sheet, data, rowIdx) {
@@ -410,22 +390,36 @@
             toggleLoader(false);
         }
 
-        function toggleLoader(s) { document.getElementById('loader').style.display = s ? 'flex' : 'none'; }
-        function calcExTwd() { document.getElementById('ex_twd_display').innerText = Math.round(parseFloat(document.getElementById('ex_rate').value || 0) * parseFloat(document.getElementById('ex_amt').value || 0)); }
-        function calcTwd() {
-            const cur = document.getElementById('e_cur').value, amt = parseFloat(document.getElementById('e_amt').value) || 0;
-            if(cur === "TWD") document.getElementById('e_twd_val').innerText = amt;
-            else {
-                const ex = db.Exchange.slice(1).reverse().find(r => r[0] == document.getElementById('e_trip').value && r[3] == cur);
-                document.getElementById('e_twd_val').innerText = ex ? Math.round(amt * ex[4]) : "匯率未知";
-            }
+        async function deleteData(sheet, idx) {
+            if(!confirm("確定刪除此筆資料？")) return;
+            toggleLoader(true);
+            await fetch(API_URL, { method: 'POST', body: JSON.stringify({sheet, method: "delete", rowIdx: idx}) });
+            await fetchData();
+            toggleLoader(false);
         }
+
+        function editTrip(idx) { const r = db.Trips[idx]; document.getElementById('t_rowIdx').value = idx; document.getElementById('t_name').value = r[0]; document.getElementById('t_start').value = r[1]; document.getElementById('t_end').value = r[2]; document.getElementById('t_members').value = r[3]; showSec('trip'); }
+        function editEx(idx) { const r = db.Exchange[idx]; document.getElementById('ex_rowIdx').value = idx; document.getElementById('ex_date').value = r[1]; document.getElementById('ex_loc').value = r[2]; document.getElementById('ex_cur').value = r[3]; document.getElementById('ex_rate').value = r[4]; document.getElementById('ex_amt').value = r[5]; document.getElementById('ex_src').value = r[7]; calcExTwd(); showSec('ex'); }
+        function editExp(idx) { 
+            const r = db.Expenses[idx]; document.getElementById('e_rowIdx').value = idx; document.getElementById('e_date').value = r[1]; document.getElementById('e_cat').value = r[2]; document.getElementById('e_item').value = r[3]; document.getElementById('e_amt').value = r[4]; document.getElementById('e_cur').value = r[5]; document.getElementById('e_split_type').value = r[9]; document.getElementById('e_pay_method').value = r[10]; document.getElementById('e_note').value = r[11];
+            syncExpUI();
+            setTimeout(() => {
+                const ps = r[7].split(','), ms = r[8].split(',');
+                document.querySelectorAll('.p-b').forEach(b => { if(ps.includes(b.innerText)) b.classList.add('active'); });
+                document.querySelectorAll('.m-b').forEach(b => { if(ms.includes(b.innerText)) b.classList.add('active'); });
+                updateSplitUI();
+            }, 100);
+            showSec('exp'); 
+        }
+
+        function updateTripList() { document.getElementById('trip-list-area').innerHTML = db.Trips.slice(1).map((r, i) => `<div class="card p-2 mb-2 d-flex justify-content-between flex-row align-items-center"><div><b>${r[0]}</b><br><small>${r[1]}~${r[2]}</small></div><div><span class="edit-btn" onclick="editTrip(${i+1})">✏️</span><span class="del-btn" onclick="deleteData('Trips', ${i+1})">🗑️</span></div></div>`).join(''); }
+        function toggleLoader(s) { document.getElementById('loader').style.display = s ? 'flex' : 'none'; }
         function drawPie(id, labels, data) {
             if(charts[id]) charts[id].destroy();
-            charts[id] = new Chart(document.getElementById(id), { type: 'doughnut', data: { labels, datasets: [{ data, backgroundColor: labels.map(l => getCol(l)) }] }, options: { cutout: '70%', plugins: { legend: { position: 'bottom', labels: { boxWidth: 12 } } } } });
+            charts[id] = new Chart(document.getElementById(id), { type: 'doughnut', data: { labels, datasets: [{ data, backgroundColor: labels.map(l => getCol(l)) }] }, options: { cutout: '70%', plugins: { legend: { position: 'bottom' }, tooltip: { callbacks: { label: (ctx) => ` ${ctx.label}: ${Math.round(ctx.raw).toLocaleString()} TWD` } } } } });
         }
         function getCol(c) {
-            const colors = { '機票': '#4f6d5a', '交通': '#8c7b6c', '住宿': '#d9c5b2', '飲食(餐)': '#b66a50', '玩樂': '#2d4a3e' };
+            const colors = { '機票': '#4f6d5a', '交通': '#8c7b6c', '住宿': '#d9c5b2', '飲食(餐)': '#b66a50', '玩樂': '#2d4a3e', '紀念品': '#b66a50' };
             return colors[c] || '#' + Math.floor(Math.random()*16777215).toString(16);
         }
     </script>
