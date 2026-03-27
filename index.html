@@ -70,7 +70,7 @@
             <select id="e_trip" class="form-select mb-2" onchange="syncTrip(this.value); syncExpUI();"></select>
             <div class="row g-2 mb-2">
                 <div class="col-6"><input type="date" id="e_date" class="form-control"></div>
-                <div class="col-6"><select id="e_cat" class="form-select"><option>機票</option><option>交通</option><option>住宿</option><option>飲食(餐)</option><option>零食點心飲料</option><option>玩樂</option><option>紀念品(禮用品)</option><option>團費</option><option>其他</option></select></div>
+                <div class="col-6"><select id="e_cat" class="form-select"><option>機票</option><option>交通</option><option>住宿</option><option>飲食(餐)</option><option>零食點心飲料</option><option>玩樂</option><option>紀念品(禮用品)</option><option>紀念品(食品)</option><option>團費</option><option>保險</option><option>其他</option></select></div>
             </div>
             <input type="text" id="e_item" class="form-control mb-2" placeholder="品項名稱">
             <div class="row g-2 mb-1">
@@ -399,9 +399,24 @@
         function updateExpList() {
             const trip = document.getElementById('e_trip').value;
             const data = db.Expenses.slice(1).map((r, i) => ({r, i: i+1})).filter(o => o.r[0] == trip);
-            document.getElementById('exp-list-area').innerHTML = `<table class="table table-sm"><tbody>` + 
-                data.map(o => `<tr><td>${o.r[1]}</td><td>${o.r[3]}</td><td>$${o.r[6]}</td><td><span class="edit-btn" onclick="editExp(${o.i})">✏️</span><span class="del-btn" onclick="deleteData('Expenses', ${o.i})">🗑️</span></td></tr>`).join('') + `</tbody></table>`;
+            document.getElementById('exp-list-area').innerHTML = `
+                <table class="table table-sm mt-2">
+                    <thead><tr><th>日期</th><th>項目</th><th>台幣金額</th><th>參與者</th><th></th></tr></thead>
+                    <tbody>${data.map(o => `
+                        <tr>
+                            <td>${o.r[1]}</td>
+                            <td>${o.r[3]}</td>
+                            <td>$${o.r[6]}</td>
+                            <td>${o.r[8]}</td>
+                            <td>
+                                <span class="edit-btn" onclick="editExp(${o.i})">✏️</span>
+                                <span class="del-btn" onclick="deleteData('Expenses', ${o.i})">🗑️</span>
+                            </td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>`;
         }
+
 
         function syncExpUI() {
             const tName = document.getElementById('e_trip').value;
