@@ -329,20 +329,50 @@
             });
 
             // 3. 淨額清算 (需求 4 & 6)
-            let bal = {}; mems.forEach(m => bal[m] = 0);
-            exps.forEach(r => {
-                const twd = parseFloat(r[6]) || 0;
-                const rate = twd / (parseFloat(r[4]) || 1);
-                // 付款 (+)
-                if(r[13].includes('[P:')) {
-                    r[13].match(/\[P:(.*?)\]/)[1].split('|').forEach(s => { const [n,v]=s.split(':'); if(bal[n]!==undefined) bal[n]+=parseFloat(v)*rate; });
-                } else { if(bal[r[7]]!==undefined) bal[r[7]] += twd; }
-                // 分攤 (-)
-                const ms = r[8].split(',');
-                if(r[9] === '分攤金額' && r[13].includes('[M:')) {
-                    r[13].match(/\[M:(.*?)\]/)[1].split('|').forEach(s => { const [n,v]=s.split(':'); if(bal[n]!==undefined) bal[n]-=parseFloat(v)*rate; });
-                } else { ms.forEach(m => { if(bal[m]!==undefined) bal[m] -= twd / ms.length; }); }
-            });
+          // 2. 清算計算 (同步記帳列表的債務邏輯)
+let bal = {}; mems.forEach(m => bal[m] = 0);
+
+exps.forEach(r => {
+    const twd = parseFloat(r[6]) || 0;
+    const ratio = twd / (parseFloat(r[4]) || 1);
+    const meta = r[13] || "";
+    const payers = r[7].split(',').map(n => n.trim());      // 付款人陣列
+    const splitters = r[8].split(',').map(n => n.trim());   // 分攤人陣列
+
+    // A. 處理付款 (加項：誰付了錢，誰的餘額就增加)
+    if (meta.includes('[P:')) {
+        const pMatch = meta.match(/\[P:(.*?)\]/);
+        if (pMatch) pMatch[1].split('|').forEach(s => {
+            const [n, v] = s.split(':');
+            const name = n.trim();
+            if (bal.hasOwnProperty(name)) bal[name] += parseFloat(v) * ratio;
+        });
+    } else {
+        // 單人或多人平均付款
+        payers.forEach(p => {
+            const name = p.trim();
+            if (bal.hasOwnProperty(name)) bal[name] += twd / payers.length;
+        });
+    }
+
+    // B. 處理分攤 (減項：依照「債務邏輯」計算每人該出的錢，並從餘額扣除)
+    mems.forEach(m => {
+        const name = m.trim();
+        if (splitters.includes(name)) {
+            let share = 0;
+            if (r[9] === '分攤金額' && meta.includes('[M:')) {
+                const mMatch = meta.match(/\[M:(.*?)\]/);
+                if (mMatch) mMatch[1].split('|').forEach(s => {
+                    const [n, v] = s.split(':');
+                    if (n.trim() === name) share = parseFloat(v) * ratio;
+                });
+            } else {
+                share = twd / splitters.length;
+            }
+            bal[name] -= share; // 從該人帳戶扣除應付金額
+        }
+    });
+});
 
             let debtors = [], creditors = [];
             Object.entries(bal).forEach(([n, b]) => {
